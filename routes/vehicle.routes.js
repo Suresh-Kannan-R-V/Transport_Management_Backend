@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const auth = require("../middlewares/auth");
-const role = require("../middlewares/role");
-const vehicleController = require("../controllers/vehicle.controller");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
+const vehicleController = require("../controller/vehicle.controller");
 
 // Add vehicle
 router.post(

@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const auth = require("../middlewares/auth");
-const role = require("../middlewares/role");
-const scheduleController = require("../controllers/schedule.controller");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
+const scheduleController = require("../controller/schedule.controller");
 
 // Create schedule
 router.post(

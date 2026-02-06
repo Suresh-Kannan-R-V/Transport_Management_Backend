@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const auth = require("../middlewares/auth");
-const role = require("../middlewares/role");
-const leaveController = require("../controllers/leave.controller");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
+const leaveController = require("../controller/leave.controller");
 
 // Create leave request
 router.post("/", auth, role("Faculty", "Driver"), leaveController.createLeave);

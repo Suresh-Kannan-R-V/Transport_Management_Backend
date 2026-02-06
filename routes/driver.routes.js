@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const auth = require("../middlewares/auth");
-const role = require("../middlewares/role");
-const driverController = require("../controllers/driver.controller");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
+const driverController = require("../controller/driver.controller");
 
 // Create driver
 router.post(

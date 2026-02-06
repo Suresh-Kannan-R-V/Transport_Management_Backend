@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const auth = require("../middlewares/auth");
-const role = require("../middlewares/role");
-const bookingController = require("../controllers/booking.controller");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
+const bookingController = require("../controller/booking.controller");
 
 // Create booking (Faculty, Student)
 router.post(

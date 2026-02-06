@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
-const auth = require("../middlewares/auth");
-const role = require("../middlewares/role");
-const routeController = require("../controllers/route.controller");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
+const routeController = require("../controller/route.controller");
 
 // Create route
 router.post(

@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 
-const auth = require("../middlewares/auth");
-const role = require("../middlewares/role");
+const auth = require("../middleware/auth");
+const role = require("../middleware/role");
 const userController = require("../controller/user.controller");
 
 // Create user (Super Admin only)

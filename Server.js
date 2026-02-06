@@ -15,11 +15,7 @@ app.get("/", (req, res) => {
 });
 
 //Api's Paths
-app.use(
-  "/auth",
-  require("./routes/auth.routes"),
-  require("./routes/user.routes"),
-);
+app.use("/auth", require("./routes/user.routes"));
 app.use("/api", require("./routes/route"));
 
 const PORT = process.env.PORT || 8000;
