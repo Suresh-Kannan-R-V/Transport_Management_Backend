@@ -4,12 +4,12 @@ exports.createSchedule = async (req, res) => {
   try {
     const schedule = await Schedule.create({
       ...req.body,
-      created_by: req.user.id
+      created_by: req.user.id,
     });
 
     res.status(201).json({
       msg: "Schedule created successfully",
-      data: schedule
+      data: schedule,
     });
   } catch (err) {
     res.status(500).json({ msg: "Schedule creation failed" });
@@ -23,9 +23,9 @@ exports.updateSchedule = async (req, res) => {
     await Schedule.update(
       {
         ...req.body,
-        updated_by: req.user.id
+        updated_by: req.user.id,
       },
-      { where: { id } }
+      { where: { id } },
     );
 
     res.json({ msg: "Schedule updated successfully" });

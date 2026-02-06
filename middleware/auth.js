@@ -4,7 +4,7 @@ module.exports = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith("Asky ")) {
+    if (!authHeader || !authHeader.startsWith("TMS ")) {
       return res.status(401).json({
         msg: "Access denied. Token missing or invalid format"
       });

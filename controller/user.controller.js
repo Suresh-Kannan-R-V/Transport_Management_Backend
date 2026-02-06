@@ -1,19 +1,13 @@
 const { User, Driver, Role } = require("../models");
 const bcrypt = require("bcryptjs");
 
-/** 
+/**
  * Create User
  * Roles: Super Admin, Transport Admin, Driver, Faculty
  */
 exports.createUser = async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      role_id,
-      phone
-    } = req.body;
+    const { name, email, password, role_id, phone } = req.body;
 
     const existing = await User.findOne({ where: { email } });
     if (existing) {
@@ -28,12 +22,12 @@ exports.createUser = async (req, res) => {
       password: hashedPassword,
       phone,
       role_id,
-      created_by: req.user.id
+      created_by: req.user.id,
     });
 
     return res.status(201).json({
       msg: "User created successfully",
-      data: user
+      data: user,
     });
   } catch (err) {
     console.error(err);
@@ -51,9 +45,9 @@ exports.updateUser = async (req, res) => {
     await User.update(
       {
         ...req.body,
-        updated_by: req.user.id
+        updated_by: req.user.id,
       },
-      { where: { id } }
+      { where: { id } },
     );
 
     res.json({ msg: "User updated successfully" });

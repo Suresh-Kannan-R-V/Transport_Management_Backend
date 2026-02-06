@@ -2,22 +2,18 @@ const { Driver, User } = require("../models");
 
 exports.createDriver = async (req, res) => {
   try {
-    const {
-      user_id,
-      license_no,
-      license_expiry
-    } = req.body;
+    const { user_id, license_no, license_expiry } = req.body;
 
     const driver = await Driver.create({
       user_id,
       license_no,
       license_expiry,
-      created_by: req.user.id
+      created_by: req.user.id,
     });
 
     res.status(201).json({
       msg: "Driver created successfully",
-      data: driver
+      data: driver,
     });
   } catch (err) {
     res.status(500).json({ msg: "Driver creation failed" });
@@ -31,9 +27,9 @@ exports.updateDriver = async (req, res) => {
     await Driver.update(
       {
         ...req.body,
-        updated_by: req.user.id
+        updated_by: req.user.id,
       },
-      { where: { id } }
+      { where: { id } },
     );
 
     res.json({ msg: "Driver updated successfully" });

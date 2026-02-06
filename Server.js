@@ -2,7 +2,6 @@ const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
 const bodyParser = require("body-parser");
-const routes = require("./routes/route");
 const sequelize = require("./config");
 
 const app = express();
@@ -15,7 +14,13 @@ app.get("/", (req, res) => {
   res.send("Transport Management Backend Server is Running...");
 });
 
-app.use("/api", routes);
+//Api's Paths
+app.use(
+  "/auth",
+  require("./routes/auth.routes"),
+  require("./routes/user.routes"),
+);
+app.use("/api", require("./routes/route"));
 
 const PORT = process.env.PORT || 8000;
 
