@@ -15,6 +15,7 @@ app.get("/", (req, res) => {
 });
 
 //Api's Paths
+app.use("/auth", require("./routes/auth.routes"));
 app.use("/auth", require("./routes/user.routes"));
 app.use("/api", require("./routes/route"));
 
@@ -30,3 +31,6 @@ app.listen(PORT, async () => {
     console.log(" Sync error:", error);
   }
 });
+
+
+

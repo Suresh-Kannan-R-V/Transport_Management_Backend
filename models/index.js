@@ -53,6 +53,10 @@ module.exports = db;
 db.Role.hasMany(db.User, { foreignKey: "role_id" });
 db.User.belongsTo(db.Role, { foreignKey: "role_id" });
 
+//USER ↔ WEB LOGIN
+db.User.hasMany(db.WebLoginSession, { foreignKey: "user_id" });
+db.WebLoginSession.belongsTo(db.User, { foreignKey: "user_id" });
+
 // USER ↔ DRIVER
 db.User.hasOne(db.Driver, { foreignKey: "user_id" });
 db.Driver.belongsTo(db.User, { foreignKey: "user_id" });

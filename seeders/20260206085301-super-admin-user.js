@@ -28,7 +28,7 @@ module.exports = {
       [
         {
           name: "Suresh Kannan R V",
-          email: "sureshkannangeek@gmail.com",
+          email: "sureshkannan.cs23@bitsathy.ac.in",
           phone: "9025763629",
           role_id: roleId,
           status: "active",
@@ -45,7 +45,7 @@ module.exports = {
     await queryInterface.bulkDelete(
       "users",
       {
-        email: "sureshkannangeek@gmail.com",
+        email: "sureshkannan.cs23@bitsathy.ac.in",
       },
       {}
     );
