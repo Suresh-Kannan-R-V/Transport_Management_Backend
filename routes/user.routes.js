@@ -15,6 +15,6 @@ router.put(
 );
 router.get("/user/:id", auth, userController.getUserData);
 
-router.get("/users", auth, role("Super Admin"), userController.getAllUsers);
+router.get("/users", auth, role("Super Admin","Transport Admin"), userController.getAllUsers);
 
 module.exports = router;

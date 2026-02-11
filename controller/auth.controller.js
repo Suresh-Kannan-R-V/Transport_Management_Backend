@@ -75,26 +75,17 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
-
 exports.logoutUser = async (req, res) => {
   try {
-    // user already attached by auth middleware
     const userId = req.user.id;
 
-    const user = await User.findOne({
-      where: { id: userId },
-    });
-
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found",
-      });
-    }
-
-    await user.update({
-      isLogin: false,
-      token: null,
-    });
+    await User.update(
+      {
+        isLogin: false,
+        token: null,
+      },
+      { where: { id: userId } },
+    );
 
     return res.status(200).json({
       success: true,
@@ -105,6 +96,97 @@ exports.logoutUser = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Logout failed",
+    });
+  }
+};
+
+
+exports.UserLoginCheck = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader?.startsWith("TMS ")) {
+      return res.status(401).json({
+        message: "Authorization token missing",
+        forceLogout: true,
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findOne({
+      where: {
+        id: decoded.id,
+        token,
+        isLogin: true,
+      },
+      include: [{ model: Role }],
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        message: "Session expired",
+        forceLogout: true,
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({
+      message: "Invalid session",
+      forceLogout: true,
+    });
+  }
+};
+
+exports.adminLogoutUser = async (req, res) => {
+  try {
+    const adminId = req.user.id;
+    const adminRole = req.user.role;
+    const { id } = req.params;
+
+    if (Number(id) === Number(adminId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin cannot logout himself",
+      });
+    }
+
+    const user = await User.findOne({
+      where: { id },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // If already logged out
+    if (!user.isLogin) {
+      return res.status(400).json({
+        success: false,
+        message: "User already logged out",
+      });
+    }
+
+    await user.update({
+      isLogin: false,
+      token: null,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "User logged out successfully by admin",
+    });
+  } catch (err) {
+    console.error("Admin logout user error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to logout user",
     });
   }
 };

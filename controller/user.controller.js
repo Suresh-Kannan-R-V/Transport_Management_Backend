@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const { User, Driver, Role } = require("../models");
 const bcrypt = require("bcryptjs");
 
@@ -94,7 +95,7 @@ exports.getAllUsers = async (req, res) => {
     const loggedInRole = req.user.role;
 
     // Only Super Admin can access
-    if (loggedInRole !== "Super Admin") {
+    if (loggedInRole !== "Super Admin" && loggedInRole !== "Transport Admin") {
       return res.status(403).json({
         success: false,
         message: "Access denied",

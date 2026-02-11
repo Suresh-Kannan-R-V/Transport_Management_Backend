@@ -277,9 +277,6 @@ exports.getUserDevices = async (req, res) => {
   }
 };
 
-/**
- * LOGOUT DEVICE
- */
 exports.logoutDevice = async (req, res) => {
   try {
     const userId = req.user.id;

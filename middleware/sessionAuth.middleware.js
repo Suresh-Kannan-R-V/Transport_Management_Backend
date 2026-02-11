@@ -24,7 +24,7 @@ module.exports = async (req, res, next) => {
       return res.status(401).json({ msg: "User logged out" });
     }
 
-    req.user = decoded; // id, role, email, type
+    req.user = decoded;
     next();
   } catch (err) {
     console.error("Auth error:", err);
