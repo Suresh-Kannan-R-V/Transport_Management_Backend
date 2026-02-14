@@ -23,19 +23,23 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: true,
       },
+      user_name: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        unique: true,
+      },
       email: {
         type: Sequelize.STRING,
         allowNull: false,
         unique: true,
       },
-      phone: {
+      password: {
         type: Sequelize.STRING,
         allowNull: true,
       },
-      status: {
+      phone: {
         type: Sequelize.STRING,
-        allowNull: false,
-        defaultValue: "active",
+        allowNull: true,
       },
       isLogin: {
         type: Sequelize.BOOLEAN,

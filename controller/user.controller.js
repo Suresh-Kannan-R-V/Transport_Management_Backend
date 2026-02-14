@@ -1,6 +1,7 @@
 const { Op } = require("sequelize");
 const { User, Driver, Role } = require("../models");
 const bcrypt = require("bcryptjs");
+const generateUsernameFromEmail = require("../utils/helper");
 
 /**
  * Create User
@@ -8,19 +9,57 @@ const bcrypt = require("bcryptjs");
  */
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, role_id, phone } = req.body;
+    const {
+      name,
+      email,
+      role_id,
+      phone,
+      password,
+      user_name,
+      faculty_id,
+      destination,
+      department,
+      push_notification_status,
+    } = req.body;
 
-    const existing = await User.findOne({ where: { email } });
-    if (existing) {
+    // 1️⃣ Check email already exists
+    const existingEmail = await User.findOne({ where: { email } });
+    if (existingEmail) {
       return res.status(400).json({ msg: "Email already exists" });
     }
 
+    // 2️⃣ Determine username
+    let finalUsername = user_name;
+
+    if (!finalUsername) {
+      finalUsername = generateUsernameFromEmail(email);
+    }
+
+    const existingUsername = await User.findOne({
+      where: { user_name: finalUsername },
+    });
+
+    if (existingUsername) {
+      return res.status(400).json({ msg: "Username already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = await User.create({
-      name,
-      email,
-      phone,
       role_id,
-      created_by: req.user.id,
+      name,
+      user_name: finalUsername,
+      email,
+      password: hashedPassword,
+      phone,
+      isLogin: false,
+      faculty_id: faculty_id ?? null,
+      destination: destination ?? null,
+      department: department ?? null,
+      push_notification_status:
+        push_notification_status !== undefined
+          ? push_notification_status
+          : true,
     });
 
     return res.status(201).json({
@@ -35,22 +74,56 @@ exports.createUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id, user_name, email, password, ...otherFields } = req.body;
 
-    await User.update(
-      {
-        ...req.body,
-        updated_by: req.user.id,
+    // 🔎 Must provide at least one identifier
+    if (!id && !user_name && !email) {
+      return res.status(400).json({
+        msg: "Provide id OR user_name OR email to update user",
+      });
+    }
+
+    // 🔎 Find user
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [
+          id ? { id } : null,
+          user_name ? { user_name } : null,
+          email ? { email } : null,
+        ].filter(Boolean),
       },
-      { where: { id } },
-    );
+    });
 
-    res.json({ msg: "User updated successfully" });
+    if (!user) {
+      return res.status(404).json({
+        msg: "User not found",
+      });
+    }
+
+    let updateData = {
+      ...otherFields,
+      updated_by: req.user.id,
+    };
+
+    // 🔐 If password present → hash it
+    if (password) {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      updateData.password = hashedPassword;
+    }
+
+    await user.update(updateData);
+
+    res.json({
+      msg: "User updated successfully",
+      data: user,
+    });
   } catch (err) {
-    res.status(500).json({ msg: "Update failed" });
+    console.error(err);
+    res.status(500).json({
+      msg: "Update failed",
+    });
   }
 };
-
 
 exports.getUserData = async (req, res) => {
   try {
@@ -87,8 +160,6 @@ exports.getUserData = async (req, res) => {
   }
 };
 
-
-
 exports.getAllUsers = async (req, res) => {
   try {
     const loggedInUserId = req.user.id;
@@ -115,7 +186,7 @@ exports.getAllUsers = async (req, res) => {
           attributes: ["id", "name"],
         },
       ],
-      order: [["created_at", "DESC"]],
+      order: [["created_at", "ASC"]],
     });
 
     return res.status(200).json({

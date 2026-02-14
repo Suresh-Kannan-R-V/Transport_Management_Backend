@@ -8,6 +8,7 @@ const authController = require("../controller/auth.controller");
 const webController = require("../controller/webLogin.controller");
 
 router.post("/google-login", authController.googleLogin);
+router.post("/login-by-username", authController.loginByNamePassword);
 router.get("/login-check", authController.UserLoginCheck);
 
 router.post("/web-login-approve", auth, webController.approveWebLogin);

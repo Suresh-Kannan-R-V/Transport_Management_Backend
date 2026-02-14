@@ -21,6 +21,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true,
       },
+      web_access_hour: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
       expires_at: {
         type: DataTypes.DATE,
         allowNull: false,

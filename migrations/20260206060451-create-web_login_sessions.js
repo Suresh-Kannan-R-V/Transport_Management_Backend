@@ -30,7 +30,10 @@ module.exports = {
         type: Sequelize.DATE,
         allowNull: true,
       },
-
+      web_access_hour: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+      },
       expires_at: {
         type: Sequelize.DATE,
         allowNull: false,

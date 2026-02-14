@@ -1,6 +1,8 @@
 const { OAuth2Client } = require("google-auth-library");
+const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { User, Role } = require("../models");
+const { Op } = require("sequelize");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -20,13 +22,11 @@ exports.googleLogin = async (req, res) => {
     const payload = ticket.getPayload();
 
     const email = payload.email;
-    const domain = payload.hd; // bitsathy.ac.in
+    const domain = payload.hd;
 
-    if (domain !== "bitsathy.ac.in") {
-      return res.status(403).json({ message: "Unauthorized domain" });
-    }
-    console.log(email, "email");
-    console.log(domain, "domain");
+    // if (domain !== "bitsathy.ac.in") {
+    //   return res.status(403).json({ message: "Unauthorized domain" });
+    // }
 
     const user = await User.findOne({
       where: { email },
@@ -37,24 +37,23 @@ exports.googleLogin = async (req, res) => {
       return res.status(403).json({ message: "User not registered" });
     }
 
-    // 4️⃣ Single login check
     if (user.isLogin === true) {
       return res.status(403).json({
         message: "User already logged in from another device",
       });
     }
 
-    // 5️⃣ Generate JWT
     const token = jwt.sign(
       {
         id: user.id,
+        name: user.name,
+        user_name: user.user_name,
         email: user.email,
         role: user.Role.name,
       },
       process.env.JWT_SECRET,
     );
 
-    // 6️⃣ Update DB
     await user.update({
       isLogin: true,
       token: token,
@@ -65,6 +64,8 @@ exports.googleLogin = async (req, res) => {
       token,
       user: {
         id: user.id,
+        name: user.name,
+        user_name: user.user_name,
         email: user.email,
         role: user.Role.name,
       },
@@ -75,6 +76,82 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
+
+exports.loginByNamePassword = async (req, res) => {
+  try {
+    const { identifier, password } = req.body;
+
+    if (!identifier || !password) {
+      return res.status(400).json({
+        message: "Identifier and password are required",
+      });
+    }
+
+    const user = await User.findOne({
+      where: {
+        [Op.or]: [
+          { email: identifier },
+          { user_name: identifier },
+        ],
+      },
+      include: [{ model: Role }],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        message: "Invalid credentials",
+      });
+    }
+
+    if (user.isLogin === true) {
+      return res.status(403).json({
+        message: "User already logged in from another device",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        name: user.name,
+        user_name: user.user_name,
+        email: user.email,
+        role: user.Role.name,
+      },
+      process.env.JWT_SECRET
+    );
+
+    await user.update({
+      isLogin: true,
+      token: token,
+    });
+
+    return res.status(200).json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        user_name: user.user_name,
+        email: user.email,
+        role: user.Role.name,
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({
+      message: "Login failed",
+    });
+  }
+};
+
 exports.logoutUser = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -82,7 +159,6 @@ exports.logoutUser = async (req, res) => {
     await User.update(
       {
         isLogin: false,
-        token: null,
       },
       { where: { id: userId } },
     );
@@ -99,7 +175,6 @@ exports.logoutUser = async (req, res) => {
     });
   }
 };
-
 
 exports.UserLoginCheck = async (req, res, next) => {
   try {
@@ -165,7 +240,6 @@ exports.adminLogoutUser = async (req, res) => {
       });
     }
 
-    // If already logged out
     if (!user.isLogin) {
       return res.status(400).json({
         success: false,
@@ -175,7 +249,6 @@ exports.adminLogoutUser = async (req, res) => {
 
     await user.update({
       isLogin: false,
-      token: null,
     });
 
     return res.status(200).json({

@@ -5,11 +5,29 @@ module.exports = (sequelize, DataTypes) => {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       role_id: { type: DataTypes.INTEGER },
       name: DataTypes.STRING,
+      user_name: { type: DataTypes.STRING, unique: true },
       email: { type: DataTypes.STRING, unique: true },
+      password: DataTypes.STRING,
       phone: DataTypes.STRING,
       isLogin: DataTypes.BOOLEAN,
       token: DataTypes.TEXT,
-      status: DataTypes.STRING,
+
+      faculty_id: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      destination: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      department: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
+      push_notification_status: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: true,
+      },
     },
     { timestamps: true, createdAt: "created_at", updatedAt: false },
   );

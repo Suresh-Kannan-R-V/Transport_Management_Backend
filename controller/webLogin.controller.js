@@ -77,6 +77,7 @@ exports.createWebLoginSession = async (req, res) => {
       id: randomUUID(),
       status: "PENDING",
       expires_at: new Date(now.getTime() + 2 * 60 * 1000), // 2 minutes
+      web_access_hour:0
     });
 
     return res.status(201).json({
@@ -124,6 +125,7 @@ exports.approveWebLogin = async (req, res) => {
       user_id: userId,
       status: "APPROVED",
       web_access_expires_at: new Date(Date.now() + hours * 60 * 60 * 1000),
+      web_access_hour: accessHours,
     });
 
     return res.json({
@@ -166,7 +168,10 @@ exports.checkWebLoginSession = async (req, res) => {
     }
 
     // APPROVED → issue token ONCE
-    const user = session.User;
+
+    if (!session.web_access_expires_at) {
+      return res.status(400).json({ message: "Invalid session state" });
+    }
 
     const expiresInSeconds = Math.floor(
       (new Date(session.web_access_expires_at) - now) / 1000,
@@ -176,13 +181,16 @@ exports.checkWebLoginSession = async (req, res) => {
       await session.update({ status: "EXPIRED" });
       return res.status(410).json({ message: "Web access expired" });
     }
+    const user = session.User;
 
     const token = jwt.sign(
       {
         id: user.id,
+        name: user.name,
+        user_name: user.user_name,
         email: user.email,
         role: user.Role.name,
-        sessionId,
+        sessionId: session.id,
         type: "WEB",
       },
       process.env.JWT_SECRET,
@@ -198,8 +206,11 @@ exports.checkWebLoginSession = async (req, res) => {
       status: "APPROVED",
       token,
       expiresAt: session.web_access_expires_at,
+      expireHour: session.web_access_hour,
       user: {
         id: user.id,
+        name: user.name,
+        user_name: user.user_name,
         email: user.email,
         role: user.Role.name,
       },
