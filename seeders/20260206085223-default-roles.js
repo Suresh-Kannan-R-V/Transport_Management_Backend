@@ -6,9 +6,6 @@ module.exports = {
       "roles",
       [
         {
-          name: "Super Admin",
-        },
-        {
           name: "Transport Admin",
         },
         {

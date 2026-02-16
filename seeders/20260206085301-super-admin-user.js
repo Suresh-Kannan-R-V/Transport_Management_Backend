@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 module.exports = {
   async up(queryInterface, Sequelize) {
     const [roles] = await queryInterface.sequelize.query(
-      `SELECT id, name FROM roles WHERE name = 'Super Admin' LIMIT 1`
+      `SELECT id, name FROM roles WHERE name = 'Transport Admin' LIMIT 1`
     );
 
     if (!roles.length) {
@@ -15,7 +15,7 @@ module.exports = {
 
     const role = roles[0];
 
-    const hashedPassword = await bcrypt.hash("SuperAdmin@123", 10);
+    const hashedPassword = await bcrypt.hash("Admin@123", 10);
 
     await queryInterface.bulkInsert("users", [
       {

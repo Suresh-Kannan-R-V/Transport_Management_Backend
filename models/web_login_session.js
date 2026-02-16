@@ -40,7 +40,6 @@ module.exports = (sequelize, DataTypes) => {
   WebLoginSession.associate = (models) => {
     WebLoginSession.belongsTo(models.User, {
       foreignKey: "user_id",
-      as: "user",
     });
   };
 

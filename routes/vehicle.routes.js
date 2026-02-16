@@ -4,21 +4,37 @@ const router = express.Router();
 const auth = require("../middleware/sessionAuth.middleware");
 const role = require("../middleware/role");
 const vehicleController = require("../controller/vehicle.controller");
+const upload = require("../middleware/upload.middleware");
 
-// Add vehicle
 router.post(
-  "/",
+  "/create",
   auth,
-  role("Super Admin", "Transport Admin"),
-  vehicleController.createVehicle
+  role("Transport Admin"),
+  upload.single("file"),
+  vehicleController.createVehicle,
 );
 
-// Update vehicle
 router.put(
-  "/:id",
+  "/update",
   auth,
-  role("Super Admin", "Transport Admin"),
-  vehicleController.updateVehicle
+  role("Transport Admin"),
+  upload.single("file"),
+  vehicleController.bulkUpdateVehicles,
+);
+
+router.delete(
+  "/delete",
+  auth,
+  role("Transport Admin"),
+  upload.single("file"),
+  vehicleController.bulkDeleteVehicles,
+);
+
+router.get(
+  "/get-all",
+  auth,
+  role("Transport Admin"),
+  vehicleController.getAllVehicles,
 );
 
 module.exports = router;
