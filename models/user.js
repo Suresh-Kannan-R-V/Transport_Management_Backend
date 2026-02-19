@@ -35,7 +35,6 @@ module.exports = (sequelize, DataTypes) => {
   User.associate = (models) => {
     User.belongsTo(models.Role, { foreignKey: "role_id" });
     User.hasOne(models.Driver, { foreignKey: "user_id" });
-    User.hasMany(models.Booking, { foreignKey: "user_id" });
     User.hasMany(models.Notification, { foreignKey: "user_id" });
     User.hasMany(models.LeaveRequest, { foreignKey: "user_id" });
   };

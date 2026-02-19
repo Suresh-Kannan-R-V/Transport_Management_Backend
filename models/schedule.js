@@ -79,6 +79,7 @@ module.exports = (sequelize, DataTypes) => {
 
     Schedule.belongsTo(models.User, {
       foreignKey: "approved_by",
+       as: "approver",
     });
 
     Schedule.hasMany(models.Booking, {

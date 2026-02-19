@@ -20,6 +20,20 @@ router.patch(
   controller.cancelTransportRequest,
 );
 
+router.patch(
+  "/uncancel-transport-request/:route_id",
+  auth,
+  role("Faculty", "Transport Admin"),
+  controller.uncancelTransportRequest,
+);
+
+router.delete(
+  "/delete-transport-request/:route_id",
+  auth,
+  role("Faculty", "Transport Admin"),
+  controller.deleteTransportRequest,
+);
+
 router.get(
   "/get-all",
   auth,
@@ -27,11 +41,18 @@ router.get(
   controller.getAllRoutes,
 );
 
+router.get(
+  "/get-by-id/:route_id",
+  auth,
+  role("Transport Admin", "Faculty"),
+  controller.getRouteById,
+);
+
 //Admin
 router.post(
   "/assign-vehicles",
   auth,
-  role("Transport Admin", "Faculty"),
+  role("Transport Admin"),
   controller.assignVehicles,
 );
 

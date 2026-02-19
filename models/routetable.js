@@ -101,6 +101,11 @@ module.exports = (sequelize, DataTypes) => {
     Route.hasMany(models.Booking, {
       foreignKey: "route_id",
     });
+    Route.hasMany(models.AuditLog, {
+      foreignKey: "entity_id",
+      scope: { entity: "route" },
+      constraints: false,
+    });
   };
 
   return Route;

@@ -69,9 +69,6 @@ db.LeaveRequest.belongsTo(db.User, { foreignKey: "user_id" });
 db.Schedule.hasMany(db.LeaveRequest, { foreignKey: "schedule_id" });
 db.LeaveRequest.belongsTo(db.Schedule, { foreignKey: "schedule_id" });
 
-// VEHICLE ↔ VEHICLE_MAINTENANCE
-db.Vehicle.hasMany(db.VehicleMaintenance, { foreignKey: "vehicle_id" });
-db.VehicleMaintenance.belongsTo(db.Vehicle, { foreignKey: "vehicle_id" });
 
 // USER ↔ NOTIFICATIONS
 db.User.hasMany(db.Notification, { foreignKey: "user_id" });
@@ -80,10 +77,6 @@ db.Notification.belongsTo(db.User, { foreignKey: "user_id" });
 // USER (ADMIN) ↔ AUDIT_LOGS
 db.User.hasMany(db.AuditLog, { foreignKey: "admin_id" });
 db.AuditLog.belongsTo(db.User, { foreignKey: "admin_id"});
-
-// VEHICLE / DRIVER / SCHEDULE ↔ USAGE_HISTORY
-db.Vehicle.hasMany(db.UsageHistory, { foreignKey: "vehicle_id" });
-db.UsageHistory.belongsTo(db.Vehicle, { foreignKey: "vehicle_id" });
 
 db.Driver.hasMany(db.UsageHistory, { foreignKey: "driver_id" });
 db.UsageHistory.belongsTo(db.Driver, { foreignKey: "driver_id" });

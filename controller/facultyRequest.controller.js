@@ -1,8 +1,13 @@
 const XLSX = require("xlsx");
 const {
   Route,
+  LeaveRequest,
+  Notification,
+  UsageHistory,
+  VehicleMaintenance,
   RouteStop,
   Booking,
+  AuditLog,
   Schedule,
   Vehicle,
   Driver,
@@ -36,18 +41,16 @@ exports.createTransportRequest = async (req, res) => {
     if (!travel_info?.type || !travel_info?.start_date) {
       throw new Error("Travel type and start date are required");
     }
+    const travelType = travel_info.type?.toLowerCase().trim();
 
-    if (
-      travel_info.type.toLowerCase() === "multi days" ||
-      travel_info.type.toLowerCase() === "multidays"
-    ) {
+    if (travelType === "multi day") {
       if (!travel_info.end_date) {
         throw new Error("End date is required for multi day travel");
       }
     } else {
       travel_info.end_date = null;
     }
-
+    
     if (
       !route_details?.selected_locations ||
       route_details.selected_locations.length < 2
@@ -143,7 +146,7 @@ exports.createTransportRequest = async (req, res) => {
         created_by: userId,
         travel_type: travel_info.type,
         start_datetime: travel_info.start_date,
-        end_datetime: travel_info.end_date,
+        end_datetime: travelType === "multi day" ? travel_info.end_date : null,
         approx_distance_km: route_details.distance_km,
         approx_duration_minutes: route_details.duration_mins,
         passenger_count: passengerCount,
@@ -219,7 +222,7 @@ exports.cancelTransportRequest = async (req, res) => {
     }
 
     await route.update({
-      status: "cancelled_by_faculty",
+      status: "cancelled",
       faculty_remark: "Cancelled by faculty",
     });
 
@@ -235,6 +238,129 @@ exports.cancelTransportRequest = async (req, res) => {
   }
 };
 
+exports.uncancelTransportRequest = async (req, res) => {
+  try {
+    const { route_id } = req.params;
+
+    const route = await Route.findByPk(route_id);
+
+    if (!route) {
+      throw new Error("Route not found");
+    }
+
+    // Only allow if currently cancelled
+    if (route.status !== "cancelled") {
+      throw new Error("Only cancelled requests can be restored");
+    }
+
+    await route.update({
+      status: "pending",
+      faculty_remark: null,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Transport request restored successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+exports.deleteTransportRequest = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+    const { route_id } = req.params;
+
+    const route = await Route.findByPk(route_id, {
+      include: [
+        {
+          model: Schedule,
+        },
+      ],
+      transaction: t,
+    });
+
+    if (!route) {
+      throw new Error("Route not found");
+    }
+
+    if (req.user.role === "Faculty" && route.status !== "pending") {
+      throw new Error("Faculty can delete only pending requests");
+    }
+
+    // 1️⃣ Get all schedules
+    const schedules = await Schedule.findAll({
+      where: { route_id },
+      transaction: t,
+    });
+
+    const scheduleIds = schedules.map((s) => s.id);
+
+    // 2️⃣ Delete Bookings
+    await Booking.destroy({
+      where: { route_id },
+      transaction: t,
+    });
+
+    // 3️⃣ Delete UsageHistory
+    await UsageHistory.destroy({
+      where: { schedule_id: scheduleIds },
+      transaction: t,
+    });
+
+    // 4️⃣ Delete LeaveRequests
+    await LeaveRequest.destroy({
+      where: { schedule_id: scheduleIds },
+      transaction: t,
+    });
+
+    // 5️⃣ Delete Schedules
+    await Schedule.destroy({
+      where: { route_id },
+      transaction: t,
+    });
+
+    // 6️⃣ Delete RouteStops
+    await RouteStop.destroy({
+      where: { route_id },
+      transaction: t,
+    });
+
+    // 7️⃣ Delete Audit Logs
+    await AuditLog.destroy({
+      where: {
+        entity_id: route_id,
+        entity: "route",
+      },
+      transaction: t,
+    });
+
+    // 8️⃣ Finally Delete Route
+    await Route.destroy({
+      where: { id: route_id },
+      transaction: t,
+    });
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Transport request deleted permanently",
+    });
+  } catch (error) {
+    await t.rollback();
+
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 //Get All Request Data
 exports.getAllRoutes = async (req, res) => {
   try {
@@ -242,46 +368,43 @@ exports.getAllRoutes = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const offset = (page - 1) * limit;
 
-    const search = req.query.search || "";
+    const search = req.query.search?.trim() || "";
     const status = req.query.status;
     const travelType = req.query.travel_type;
-    const startDate = req.query.start_date;
-    const endDate = req.query.end_date;
+
+    const sortBy = req.query.sortBy || "created_at";
+    const sortOrder = req.query.sortOrder || "DESC";
 
     let whereCondition = {};
 
-    if (status) whereCondition.status = status;
-    if (travelType) whereCondition.travel_type = travelType;
+    if (status && status !== "") {
+      whereCondition.status = status;
+    }
 
-    if (startDate && endDate) {
-      whereCondition.start_datetime = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
+    if (travelType && travelType !== "") {
+      whereCondition.travel_type = travelType;
+    }
+
+    if (search) {
+      whereCondition.route_name = {
+        [Op.like]: `%${search}%`,
       };
     }
 
+    let orderClause = [[sortBy, sortOrder]];
+
     const { rows, count } = await Route.findAndCountAll({
       where: whereCondition,
-
       include: [
         {
           model: User,
           as: "creator",
           attributes: ["id", "name", "faculty_id"],
-          where: search
-            ? {
-                [Op.or]: [
-                  { name: { [Op.like]: `%${search}%` } },
-                  { faculty_id: { [Op.like]: `%${search}%` } },
-                ],
-              }
-            : undefined,
         },
-
         {
           model: RouteStop,
           attributes: ["stop_name", "stop_order"],
         },
-
         {
           model: Schedule,
           attributes: ["id"],
@@ -302,11 +425,10 @@ exports.getAllRoutes = async (req, res) => {
           ],
         },
       ],
-
       limit,
       offset,
-      distinct: true, // IMPORTANT when using include
-      order: [["created_at", "DESC"]],
+      distinct: true,
+      order: orderClause, // ✅ FIXED
     });
 
     const formatted = rows.map((route) => {
@@ -331,19 +453,6 @@ exports.getAllRoutes = async (req, res) => {
       const sortedStops =
         route.RouteStops?.sort((a, b) => a.stop_order - b.stop_order) || [];
 
-      const startLocation =
-        sortedStops.length > 0 ? sortedStops[0].stop_name : null;
-
-      const destinationLocation =
-        sortedStops.length > 1
-          ? sortedStops[sortedStops.length - 1].stop_name
-          : null;
-
-      const intermediateStops =
-        sortedStops.length > 2
-          ? sortedStops.slice(1, -1).map((s) => s.stop_name)
-          : [];
-
       return {
         id: route.id,
         routeName: route.route_name,
@@ -357,9 +466,13 @@ exports.getAllRoutes = async (req, res) => {
         start_datetime: route.start_datetime,
         end_datetime: route.end_datetime,
         passengerCount: route.passenger_count,
-        startLocation,
-        destinationLocation,
-        intermediateStops,
+        startLocation: sortedStops[0]?.stop_name || null,
+        destinationLocation:
+          sortedStops[sortedStops.length - 1]?.stop_name || null,
+        intermediateStops:
+          sortedStops.length > 2
+            ? sortedStops.slice(1, -1).map((s) => s.stop_name)
+            : [],
         vehicleAssigned,
         driverAssigned,
         createdAt: route.created_at,
@@ -378,6 +491,183 @@ exports.getAllRoutes = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch routes",
+    });
+  }
+};
+
+exports.getRouteById = async (req, res) => {
+  try {
+    const routeId = req.params.route_id;
+
+    if (!routeId) {
+      return res.status(400).json({
+        success: false,
+        message: "Route ID is required",
+      });
+    }
+
+    const route = await Route.findOne({
+      where: { id: routeId },
+      include: [
+        {
+          model: User,
+          as: "creator",
+          attributes: [
+            "id",
+            "name",
+            "user_name",
+            "email",
+            "phone",
+            "faculty_id",
+            "destination",
+            "department",
+          ],
+        },
+        {
+          model: RouteStop,
+          attributes: ["stop_name", "stop_order"],
+        },
+        {
+          model: Schedule,
+          attributes: [
+            "id",
+            "allocated_passenger_count",
+            "status",
+            "approved_at",
+            "start_datetime",
+            "end_datetime",
+          ],
+          include: [
+            {
+              model: Vehicle,
+              attributes: ["id", "vehicle_number", "vehicle_type"],
+            },
+            {
+              model: Driver,
+              attributes: ["id"],
+              include: [
+                {
+                  model: User,
+                  attributes: ["name", "phone"],
+                },
+              ],
+            },
+            {
+              model: Booking,
+              attributes: [
+                "id",
+                "guest_name",
+                "country_code",
+                "guest_phone",
+                "seat_number",
+                "booking_status",
+              ],
+            },
+            {
+              model: User,
+              as: "approver",
+              attributes: ["id", "name"],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!route) {
+      return res.status(404).json({
+        success: false,
+        message: "Route not found",
+      });
+    }
+
+    // ---------- SORT STOPS ----------
+    const sortedStops =
+      route.RouteStops?.sort((a, b) => a.stop_order - b.stop_order) || [];
+
+    const selectedLocations = sortedStops.map((s) => s.stop_name);
+
+    // ---------- FORMAT SCHEDULES ----------
+    const schedules = route.Schedules.map((schedule) => {
+      return {
+        schedule_id: schedule.id,
+        status: schedule.status,
+        start_datetime: schedule.start_datetime,
+        end_datetime: schedule.end_datetime,
+
+        vehicle: schedule.Vehicle
+          ? {
+              id: schedule.Vehicle.id,
+              vehicle_number: schedule.Vehicle.vehicle_number,
+              vehicle_type: schedule.Vehicle.vehicle_type,
+              assigned_at: schedule.approved_at,
+              assigned_by: schedule.approver?.name || null,
+            }
+          : null,
+
+        driver: schedule.Driver
+          ? {
+              id: schedule.Driver.id,
+              name: schedule.Driver.User?.name,
+              phone: schedule.Driver.User?.phone,
+            }
+          : null,
+
+        guest_count: schedule.Bookings.length,
+
+        guests: schedule.Bookings?.sort(
+          (a, b) => a.seat_number - b.seat_number,
+        ).map((guest) => ({
+          id: guest.id,
+          name: guest.guest_name,
+          phone: `${guest.country_code} ${guest.guest_phone}`,
+          seat_number: guest.seat_number,
+          status: guest.booking_status,
+        })),
+      };
+    });
+
+    // ---------- FINAL RESPONSE ----------
+    const response = {
+      travel_info: {
+        route_name: route.route_name,
+        type: route.travel_type,
+        start_date: route.start_datetime,
+        end_date: route.end_datetime,
+      },
+
+      route_details: {
+        selected_locations: selectedLocations,
+        distance_km: route.approx_distance_km,
+        duration_mins: route.approx_duration_minutes,
+      },
+
+      vehicle_config: {
+        passenger_count: route.passenger_count,
+      },
+
+      additional_info: {
+        special_requirements: route.description,
+        luggage_details: route.luggage_details,
+      },
+      route_status: route.status,
+      faculty_remark: route.faculty_remark,
+      admin_remark: route.admin_remark,
+      created_at: route.created_at,
+
+      creator: route.creator,
+
+      schedules,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: response,
+    });
+  } catch (error) {
+    console.error("Get Route By ID Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch route details",
     });
   }
 };
