@@ -77,7 +77,7 @@ exports.createWebLoginSession = async (req, res) => {
       id: randomUUID(),
       status: "PENDING",
       expires_at: new Date(now.getTime() + 2 * 60 * 1000), // 2 minutes
-      web_access_hour:0
+      web_access_hour: 0,
     });
 
     return res.status(201).json({
@@ -197,8 +197,6 @@ exports.checkWebLoginSession = async (req, res) => {
       { expiresIn: expiresInSeconds },
     );
 
-    // ✅ STORE TOKEN
-    await User.update({ token, isLogin: true }, { where: { id: user.id } });
 
     await session.update({ status: "EXPIRED" });
 

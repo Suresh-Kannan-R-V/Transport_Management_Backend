@@ -2,10 +2,57 @@ module.exports = (sequelize, DataTypes) => {
   const Vehicle = sequelize.define(
     "Vehicle",
     {
-      vehicle_number: { type: DataTypes.STRING, unique: true },
-      vehicle_type: DataTypes.STRING,
-      capacity: DataTypes.INTEGER,
-      status: DataTypes.STRING,
+      vehicle_number: {
+        type: DataTypes.STRING,
+        unique: true,
+        allowNull: false,
+      },
+
+      vehicle_type: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+
+      capacity: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+
+      status: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: "active",
+      },
+
+      current_kilometer: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+      },
+
+      insurance_date: {
+        type: DataTypes.DATEONLY,
+        allowNull: false,
+      },
+
+      pollution_date: {
+        type: DataTypes.DATEONLY,
+        allowNull: false,
+      },
+
+      rc_date: {
+        type: DataTypes.DATEONLY,
+        allowNull: false,
+      },
+
+      fc_date: {
+        type: DataTypes.DATEONLY,
+        allowNull: false,
+      },
+
+      next_service_date: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+      },
     },
     {
       tableName: "vehicles",

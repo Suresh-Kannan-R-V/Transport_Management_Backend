@@ -76,7 +76,6 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
-
 exports.loginByNamePassword = async (req, res) => {
   try {
     const { identifier, password } = req.body;
@@ -89,10 +88,7 @@ exports.loginByNamePassword = async (req, res) => {
 
     const user = await User.findOne({
       where: {
-        [Op.or]: [
-          { email: identifier },
-          { user_name: identifier },
-        ],
+        [Op.or]: [{ email: identifier }, { user_name: identifier }],
       },
       include: [{ model: Role }],
     });
@@ -125,7 +121,7 @@ exports.loginByNamePassword = async (req, res) => {
         email: user.email,
         role: user.Role.name,
       },
-      process.env.JWT_SECRET
+      process.env.JWT_SECRET,
     );
 
     await user.update({

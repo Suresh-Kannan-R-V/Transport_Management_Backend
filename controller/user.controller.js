@@ -76,7 +76,6 @@ exports.updateUser = async (req, res) => {
   try {
     const { id, user_name, email, password, ...otherFields } = req.body;
 
-    // 🔎 Must provide at least one identifier
     if (!id && !user_name && !email) {
       return res.status(400).json({
         msg: "Provide id OR user_name OR email to update user",
@@ -193,8 +192,7 @@ exports.getAllUsers = async (req, res) => {
     const loggedInUserId = req.user.id;
     const loggedInRole = req.user.role;
 
-    // Only Super Admin can access
-    if (loggedInRole !== "Super Admin" && loggedInRole !== "Transport Admin") {
+    if (loggedInRole !== "Transport Admin") {
       return res.status(403).json({
         success: false,
         message: "Access denied",

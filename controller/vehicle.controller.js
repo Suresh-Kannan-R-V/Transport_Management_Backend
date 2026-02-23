@@ -8,7 +8,6 @@ exports.createVehicle = async (req, res) => {
   try {
     let vehiclesData = [];
 
-    // EXCEL
     if (req.file) {
       const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -17,7 +16,16 @@ exports.createVehicle = async (req, res) => {
       if (!rows.length) throw new Error("Uploaded file is empty");
 
       vehiclesData = rows.map((row, index) => {
-        if (!row.vehicle_number || !row.vehicle_type || !row.capacity) {
+        if (
+          !row.vehicle_number ||
+          !row.vehicle_type ||
+          !row.capacity ||
+          !row.current_kilometer ||
+          !row.insurance_date ||
+          !row.pollution_date ||
+          !row.rc_date ||
+          !row.fc_date
+        ) {
           throw new Error(`Row ${index + 2} missing required fields`);
         }
 
@@ -26,14 +34,28 @@ exports.createVehicle = async (req, res) => {
           vehicle_type: row.vehicle_type,
           capacity: Number(row.capacity),
           status: row.status || "active",
+          current_kilometer: Number(row.current_kilometer),
+          insurance_date: row.insurance_date,
+          pollution_date: row.pollution_date,
+          rc_date: row.rc_date,
+          fc_date: row.fc_date,
+          next_service_date: row.next_service_date || null,
         };
       });
     }
 
-    // JSON BULK
     else if (Array.isArray(req.body.vehicles)) {
       vehiclesData = req.body.vehicles.map((v, index) => {
-        if (!v.vehicle_number || !v.vehicle_type || !v.capacity) {
+        if (
+          !v.vehicle_number ||
+          !v.vehicle_type ||
+          !v.capacity ||
+          v.current_kilometer == null ||
+          !v.insurance_date ||
+          !v.pollution_date ||
+          !v.rc_date ||
+          !v.fc_date
+        ) {
           throw new Error(`Vehicle at index ${index} missing required fields`);
         }
 
@@ -42,15 +64,40 @@ exports.createVehicle = async (req, res) => {
           vehicle_type: v.vehicle_type,
           capacity: Number(v.capacity),
           status: v.status || "active",
+          current_kilometer: Number(v.current_kilometer),
+          insurance_date: v.insurance_date,
+          pollution_date: v.pollution_date,
+          rc_date: v.rc_date,
+          fc_date: v.fc_date,
+          next_service_date: v.next_service_date || null,
         };
       });
     }
 
-    // SINGLE
     else {
-      const { vehicle_number, vehicle_type, capacity, status } = req.body;
+      const {
+        vehicle_number,
+        vehicle_type,
+        capacity,
+        status,
+        current_kilometer,
+        insurance_date,
+        pollution_date,
+        rc_date,
+        fc_date,
+        next_service_date,
+      } = req.body;
 
-      if (!vehicle_number || !vehicle_type || !capacity) {
+      if (
+        !vehicle_number ||
+        !vehicle_type ||
+        !capacity ||
+        current_kilometer == null ||
+        !insurance_date ||
+        !pollution_date ||
+        !rc_date ||
+        !fc_date
+      ) {
         throw new Error("Required fields missing");
       }
 
@@ -59,6 +106,12 @@ exports.createVehicle = async (req, res) => {
         vehicle_type,
         capacity: Number(capacity),
         status: status || "active",
+        current_kilometer: Number(current_kilometer),
+        insurance_date,
+        pollution_date,
+        rc_date,
+        fc_date,
+        next_service_date: next_service_date || null,
       });
     }
 
@@ -73,7 +126,9 @@ exports.createVehicle = async (req, res) => {
       throw new Error("Some vehicle numbers already exist");
     }
 
-    const created = await Vehicle.bulkCreate(vehiclesData, { transaction: t });
+    const created = await Vehicle.bulkCreate(vehiclesData, {
+      transaction: t,
+    });
 
     await t.commit();
 
@@ -85,122 +140,46 @@ exports.createVehicle = async (req, res) => {
     });
   } catch (err) {
     await t.rollback();
-    res.status(400).json({ success: false, message: err.message });
+    res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-exports.bulkUpdateVehicles = async (req, res) => {
+exports.deleteVehicle = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    let updateData = [];
+    const { id } = req.params;
 
-    // EXCEL
-    if (req.file) {
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-      if (!rows.length) throw new Error("Uploaded file is empty");
-
-      updateData = rows.map((row, index) => {
-        if (!row.id) {
-          throw new Error(`Row ${index + 2}: id is required for update`);
-        }
-
-        return {
-          id: row.id,
-          vehicle_number: row.vehicle_number,
-          vehicle_type: row.vehicle_type,
-          capacity: row.capacity ? Number(row.capacity) : undefined,
-          status: row.status,
-        };
-      });
+    if (!id) {
+      throw new Error("Vehicle ID is required");
     }
 
-    // JSON BULK
-    else if (Array.isArray(req.body.vehicles)) {
-      updateData = req.body.vehicles;
+    const vehicle = await Vehicle.findByPk(id, { transaction: t });
 
-      updateData.forEach((v, index) => {
-        if (!v.id) {
-          throw new Error(`Vehicle at index ${index} missing id`);
-        }
-      });
-    } else {
-      throw new Error("Vehicles array or file required");
+    if (!vehicle) {
+      throw new Error("Vehicle not found");
     }
 
-    for (let vehicle of updateData) {
-      const existing = await Vehicle.findByPk(vehicle.id, { transaction: t });
-
-      if (!existing) {
-        throw new Error(`Vehicle ID ${vehicle.id} not found`);
-      }
-
-      await existing.update(vehicle, { transaction: t });
-    }
+    await vehicle.destroy({ transaction: t });
 
     await t.commit();
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Vehicles updated successfully",
-      count: updateData.length,
+      message: "Vehicle deleted successfully",
     });
+
   } catch (err) {
     await t.rollback();
-    res.status(400).json({ success: false, message: err.message });
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
-
-exports.bulkDeleteVehicles = async (req, res) => {
-  const t = await sequelize.transaction();
-
-  try {
-    let ids = [];
-
-    // EXCEL
-    if (req.file) {
-      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-
-      if (!rows.length) throw new Error("Uploaded file is empty");
-
-      ids = rows.map((row, index) => {
-        if (!row.id) {
-          throw new Error(`Row ${index + 2}: id required`);
-        }
-        return row.id;
-      });
-    }
-
-    // JSON BULK
-    else if (Array.isArray(req.body.ids)) {
-      ids = req.body.ids;
-    } else {
-      throw new Error("IDs array or file required");
-    }
-
-    await Vehicle.destroy({
-      where: { id: ids },
-      transaction: t,
-    });
-
-    await t.commit();
-
-    res.json({
-      success: true,
-      message: "Vehicles deleted successfully",
-      count: ids.length,
-    });
-  } catch (err) {
-    await t.rollback();
-    res.status(400).json({ success: false, message: err.message });
-  }
-};
-
 
 exports.getAllVehicles = async (req, res) => {
   try {

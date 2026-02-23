@@ -1,6 +1,7 @@
 const XLSX = require("xlsx");
 const {
   Route,
+  Role,
   LeaveRequest,
   Notification,
   UsageHistory,
@@ -28,7 +29,6 @@ exports.createTransportRequest = async (req, res) => {
       additional_info,
     } = req.body;
 
-    // If file upload, parse JSON fields
     if (req.file) {
       travel_info = JSON.parse(travel_info);
       route_details = JSON.parse(route_details);
@@ -50,7 +50,7 @@ exports.createTransportRequest = async (req, res) => {
     } else {
       travel_info.end_date = null;
     }
-    
+
     if (
       !route_details?.selected_locations ||
       route_details.selected_locations.length < 2
@@ -109,10 +109,6 @@ exports.createTransportRequest = async (req, res) => {
       throw new Error("Invalid passenger count");
     }
 
-    if (processedGuests.length !== passengerCount) {
-      throw new Error("Passenger count does not match guest list");
-    }
-
     if (passengerCount === 1) {
       if (!processedGuests[0].name || !processedGuests[0].phone) {
         throw new Error("Name and phone required for single passenger");
@@ -135,9 +131,26 @@ exports.createTransportRequest = async (req, res) => {
       }
     }
 
-    const phones = processedGuests.map((g) => g.phone);
+    const phones = processedGuests.filter((g) => g.phone).map((g) => g.phone);
+
     if (phones.length !== new Set(phones).size) {
       throw new Error("Duplicate phone numbers found");
+    }
+
+    if (processedGuests.length > passengerCount) {
+      throw new Error("Guest count exceeds passenger count");
+    }
+
+    if (processedGuests.length < passengerCount) {
+      const currentCount = processedGuests.length;
+
+      for (let i = currentCount; i < passengerCount; i++) {
+        processedGuests.push({
+          name: `Guest ${i + 1}`,
+          phone: -1,
+          country_code: null,
+        });
+      }
     }
 
     const route = await Route.create(
@@ -292,7 +305,6 @@ exports.deleteTransportRequest = async (req, res) => {
       throw new Error("Faculty can delete only pending requests");
     }
 
-    // 1️⃣ Get all schedules
     const schedules = await Schedule.findAll({
       where: { route_id },
       transaction: t,
@@ -300,37 +312,31 @@ exports.deleteTransportRequest = async (req, res) => {
 
     const scheduleIds = schedules.map((s) => s.id);
 
-    // 2️⃣ Delete Bookings
     await Booking.destroy({
       where: { route_id },
       transaction: t,
     });
 
-    // 3️⃣ Delete UsageHistory
     await UsageHistory.destroy({
       where: { schedule_id: scheduleIds },
       transaction: t,
     });
 
-    // 4️⃣ Delete LeaveRequests
     await LeaveRequest.destroy({
       where: { schedule_id: scheduleIds },
       transaction: t,
     });
 
-    // 5️⃣ Delete Schedules
     await Schedule.destroy({
       where: { route_id },
       transaction: t,
     });
 
-    // 6️⃣ Delete RouteStops
     await RouteStop.destroy({
       where: { route_id },
       transaction: t,
     });
 
-    // 7️⃣ Delete Audit Logs
     await AuditLog.destroy({
       where: {
         entity_id: route_id,
@@ -339,7 +345,6 @@ exports.deleteTransportRequest = async (req, res) => {
       transaction: t,
     });
 
-    // 8️⃣ Finally Delete Route
     await Route.destroy({
       where: { id: route_id },
       transaction: t,
@@ -400,6 +405,7 @@ exports.getAllRoutes = async (req, res) => {
           model: User,
           as: "creator",
           attributes: ["id", "name", "faculty_id"],
+          include: [{ model: Role, attributes: ["id", "name"] }],
         },
         {
           model: RouteStop,
@@ -460,11 +466,16 @@ exports.getAllRoutes = async (req, res) => {
           user_id: route.creator?.id,
           name: route.creator?.name,
           faculty_id: route.creator?.faculty_id,
+          roles: {
+            id: route.creator?.Role?.id || null,
+            role: route.creator?.Role?.name || null,
+          },
         },
         status: route.status,
         travelType: route.travel_type,
         start_datetime: route.start_datetime,
         end_datetime: route.end_datetime,
+        approx_duration: route.approx_duration_minutes,
         passengerCount: route.passenger_count,
         startLocation: sortedStops[0]?.stop_name || null,
         destinationLocation:
@@ -521,6 +532,12 @@ exports.getRouteById = async (req, res) => {
             "faculty_id",
             "destination",
             "department",
+          ],
+          include: [
+            {
+              model: Role,
+              attributes: ["id", "name"],
+            },
           ],
         },
         {
@@ -626,6 +643,18 @@ exports.getRouteById = async (req, res) => {
       };
     });
 
+    const allGuests =
+      route.Schedules?.flatMap((schedule) => schedule.Bookings)
+        ?.sort((a, b) => a.seat_number - b.seat_number)
+        ?.map((guest) => ({
+          id: guest.id,
+          name: guest.guest_name,
+          phone:
+            `${guest.country_code || "null"} ${guest.guest_phone || ""}`.trim(),
+          seat_number: guest.seat_number,
+          status: guest.booking_status,
+        })) || [];
+
     // ---------- FINAL RESPONSE ----------
     const response = {
       travel_info: {
@@ -649,6 +678,8 @@ exports.getRouteById = async (req, res) => {
         special_requirements: route.description,
         luggage_details: route.luggage_details,
       },
+      total_guest: allGuests.length,
+      guests: allGuests,
       route_status: route.status,
       faculty_remark: route.faculty_remark,
       admin_remark: route.admin_remark,
@@ -677,50 +708,53 @@ exports.assignVehicles = async (req, res) => {
   const t = await sequelize.transaction();
 
   try {
-    const { route_id, allocations } = req.body;
+    const { route_id, allocations, faculty_remark, admin_remark } = req.body;
 
-    if (!route_id || !allocations || !allocations.length) {
+    if (!route_id || !Array.isArray(allocations) || allocations.length === 0) {
       throw new Error("route_id and allocations are required");
     }
 
     const route = await Route.findByPk(route_id, {
       include: [{ model: Booking }],
+      transaction: t,
     });
 
     if (!route) throw new Error("Route not found");
+    if (!route.Bookings.length) throw new Error("No bookings found");
 
-    const totalGuests = route.bookings.length;
+    // 🔹 Save remarks if provided
+    await route.update(
+      {
+        faculty_remark: faculty_remark ?? route.faculty_remark,
+        admin_remark: admin_remark ?? route.admin_remark,
+        status: "Vehicle Assigned",
+      },
+      { transaction: t },
+    );
 
+    const totalGuests = route.Bookings.length;
     const assignedGuestIds = allocations.flatMap((a) => a.guest_ids);
 
-    // Duplicate check
-    const unique = new Set(assignedGuestIds);
-    if (unique.size !== assignedGuestIds.length) {
+    if (new Set(assignedGuestIds).size !== assignedGuestIds.length)
       throw new Error("Duplicate guest assignment detected");
-    }
 
-    // Ensure all guests assigned
-    if (assignedGuestIds.length !== totalGuests) {
+    if (assignedGuestIds.length !== totalGuests)
       throw new Error("All guests must be assigned");
-    }
 
-    // Create schedule per vehicle
+    const vehicleIds = allocations.map((a) => a.vehicle_id);
+
     for (const allocation of allocations) {
       const { vehicle_id, guest_ids } = allocation;
 
-      if (!vehicle_id || !guest_ids.length) {
-        throw new Error("vehicle_id and guest_ids required");
-      }
-
-      const schedule = await Schedule.create(
+      let schedule = await Schedule.create(
         {
-          route_id: route_id,
+          route_id,
           vehicle_id,
-          driver_id: null, // 🚨 driver assigned later
+          driver_id: null,
           allocated_passenger_count: guest_ids.length,
           start_datetime: route.start_datetime,
           end_datetime: route.end_datetime || route.start_datetime,
-          status: "vehicle_assigned",
+          status: "Vehicle Assigned",
           approved_by: req.user.id,
           approved_at: new Date(),
         },
@@ -733,16 +767,151 @@ exports.assignVehicles = async (req, res) => {
       );
     }
 
-    await Route.update(
-      { status: "vehicle_assigned" },
-      { where: { id: route_id }, transaction: t },
+    // 🔥 Mark vehicles as assigned
+    await Vehicle.update(
+      { status: "assigned" },
+      { where: { id: vehicleIds }, transaction: t },
     );
 
     await t.commit();
 
     return res.status(200).json({
       success: true,
-      message: "Vehicle assigned successfully",
+      message: "Vehicle allocation created successfully",
+    });
+  } catch (error) {
+    await t.rollback();
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+//Admin Updating the Vehicle Assign already exist.
+exports.updateAssignedVehicles = async (req, res) => {
+  const t = await sequelize.transaction();
+
+  try {
+    const { route_id, allocations, faculty_remark, admin_remark } = req.body;
+
+    if (!route_id || !Array.isArray(allocations) || allocations.length === 0) {
+      throw new Error("route_id and allocations are required");
+    }
+
+    const route = await Route.findByPk(route_id, {
+      include: [{ model: Booking }],
+      transaction: t,
+    });
+
+    if (!route) throw new Error("Route not found");
+    if (!route.Bookings.length) throw new Error("No bookings found");
+
+    // 🔹 Update remarks if provided
+    await route.update(
+      {
+        faculty_remark: faculty_remark ?? route.faculty_remark,
+        admin_remark: admin_remark ?? route.admin_remark,
+        status: "Vehicle Assigned",
+      },
+      { transaction: t },
+    );
+
+    const totalGuests = route.Bookings.length;
+    const assignedGuestIds = allocations.flatMap((a) => a.guest_ids);
+
+    if (new Set(assignedGuestIds).size !== assignedGuestIds.length)
+      throw new Error("Duplicate guest assignment detected");
+
+    if (assignedGuestIds.length !== totalGuests)
+      throw new Error("All guests must be assigned");
+
+    const existingSchedules = await Schedule.findAll({
+      where: { route_id },
+      transaction: t,
+    });
+
+    if (!existingSchedules.length) throw new Error("No vehicles assigned yet.");
+
+    const existingVehicleIds = existingSchedules.map((s) => s.vehicle_id);
+    const incomingVehicleIds = allocations.map((a) => a.vehicle_id);
+
+    // 🔥 Vehicles removed → set active
+    const removedVehicleIds = existingVehicleIds.filter(
+      (id) => !incomingVehicleIds.includes(id),
+    );
+
+    if (removedVehicleIds.length) {
+      await Vehicle.update(
+        { status: "active" },
+        { where: { id: removedVehicleIds }, transaction: t },
+      );
+    }
+
+    // 🔥 Remove deleted schedules
+    for (const schedule of existingSchedules) {
+      if (!incomingVehicleIds.includes(schedule.vehicle_id)) {
+        await Booking.update(
+          { schedule_id: null },
+          { where: { schedule_id: schedule.id }, transaction: t },
+        );
+
+        await Schedule.destroy({
+          where: { id: schedule.id },
+          transaction: t,
+        });
+      }
+    }
+
+    // 🔥 Update/Create schedules
+    for (const allocation of allocations) {
+      const { vehicle_id, guest_ids } = allocation;
+
+      let schedule = existingSchedules.find((s) => s.vehicle_id === vehicle_id);
+
+      if (schedule) {
+        await schedule.update(
+          {
+            allocated_passenger_count: guest_ids.length,
+            approved_by: req.user.id,
+            approved_at: new Date(),
+          },
+          { transaction: t },
+        );
+      } else {
+        schedule = await Schedule.create(
+          {
+            route_id,
+            vehicle_id,
+            driver_id: null,
+            allocated_passenger_count: guest_ids.length,
+            start_datetime: route.start_datetime,
+            end_datetime: route.end_datetime || route.start_datetime,
+            status: "Vehicle Assigned",
+            approved_by: req.user.id,
+            approved_at: new Date(),
+          },
+          { transaction: t },
+        );
+      }
+
+      await Booking.update(
+        { schedule_id: schedule.id },
+        { where: { id: guest_ids }, transaction: t },
+      );
+    }
+
+    // 🔥 Mark all incoming vehicles as assigned
+    await Vehicle.update(
+      { status: "assigned" },
+      { where: { id: incomingVehicleIds }, transaction: t },
+    );
+
+    await t.commit();
+
+    return res.status(200).json({
+      success: true,
+      message: "Vehicle allocation updated successfully",
     });
   } catch (error) {
     await t.rollback();
@@ -793,12 +962,12 @@ exports.changeRouteStatus = async (req, res) => {
     }
 
     const allowedStatuses = [
-      "approved",
-      "rejected",
-      "vehicle_assigned",
-      "driver_assigned",
-      "completed",
-      "cancelled_by_admin",
+      "Approved",
+      "Rejected",
+      "Vehicle Assigned",
+      "Driver Assigned",
+      "Completed",
+      "Cancelled by Admin",
     ];
 
     if (!allowedStatuses.includes(status)) {

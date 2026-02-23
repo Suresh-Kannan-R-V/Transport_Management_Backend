@@ -14,20 +14,11 @@ router.post(
   vehicleController.createVehicle,
 );
 
-router.put(
-  "/update",
-  auth,
-  role("Transport Admin"),
-  upload.single("file"),
-  vehicleController.bulkUpdateVehicles,
-);
-
 router.delete(
-  "/delete",
+  "/delete/:id",
   auth,
   role("Transport Admin"),
-  upload.single("file"),
-  vehicleController.bulkDeleteVehicles,
+  vehicleController.deleteVehicle,
 );
 
 router.get(

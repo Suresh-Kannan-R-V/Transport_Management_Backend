@@ -55,6 +55,12 @@ router.post(
   role("Transport Admin"),
   controller.assignVehicles,
 );
+router.put(
+  "/update-assigned-vehicles",
+  auth,
+  role("Transport Admin"),
+  controller.updateAssignedVehicles,
+);
 
 // Assign driver separately
 router.patch(

@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 module.exports = {
   async up(queryInterface, Sequelize) {
     const [roles] = await queryInterface.sequelize.query(
-      `SELECT id, name FROM roles WHERE name = 'Transport Admin' LIMIT 1`
+      `SELECT id, name FROM roles WHERE name = 'Transport Admin' LIMIT 1`,
     );
 
     if (!roles.length) {
@@ -31,7 +31,7 @@ module.exports = {
     ]);
 
     const [users] = await queryInterface.sequelize.query(
-      `SELECT * FROM users WHERE email = 'sureshkannan.cs23@bitsathy.ac.in' LIMIT 1`
+      `SELECT * FROM users WHERE email = 'sureshkannan.cs23@bitsathy.ac.in' LIMIT 1`,
     );
 
     if (!users.length) {
@@ -48,13 +48,13 @@ module.exports = {
         email: insertedUser.email,
         role: role.name,
       },
-      process.env.JWT_SECRET || "sureshaswath05!"
+      process.env.JWT_SECRET || "sureshaswath05!",
     );
 
     await queryInterface.bulkUpdate(
       "users",
       { token: token },
-      { id: insertedUser.id }
+      { id: insertedUser.id },
     );
   },
 
