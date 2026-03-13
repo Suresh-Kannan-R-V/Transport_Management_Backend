@@ -6,13 +6,13 @@ exports.createRoute = async (req, res) => {
 
     const route = await Route.create({
       name,
-      created_by: req.user.id
+      created_by: req.user.id,
     });
 
     if (stops && stops.length > 0) {
-      const formattedStops = stops.map(stop => ({
+      const formattedStops = stops.map((stop) => ({
         ...stop,
-        route_id: route.id
+        route_id: route.id,
       }));
 
       await RouteStop.bulkCreate(formattedStops);
@@ -20,7 +20,7 @@ exports.createRoute = async (req, res) => {
 
     res.status(201).json({
       msg: "Route created successfully",
-      data: route
+      data: route,
     });
   } catch (err) {
     res.status(500).json({ msg: "Route creation failed" });
@@ -34,9 +34,9 @@ exports.updateRoute = async (req, res) => {
     await Route.update(
       {
         ...req.body,
-        updated_by: req.user.id
+        updated_by: req.user.id,
       },
-      { where: { id } }
+      { where: { id } },
     );
 
     res.json({ msg: "Route updated successfully" });

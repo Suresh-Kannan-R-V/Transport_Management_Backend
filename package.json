@@ -6,34 +6,45 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "nodemon Server.js",
-    "create:table": "node create_table.js",
     "migration:create": "npx sequelize-cli migration:create --name",
     "migrate": "npx sequelize-cli db:migrate",
-    "migrate:rollback": "npx sequelize-cli db:migrate:undo"
+    "migrate:undo": "npx sequelize-cli db:migrate:undo",
+    "migrate:undo:all": "npx sequelize-cli db:migrate:undo:all",
+    "seed": "npx sequelize-cli db:seed:all",
+    "seed:undo": "npx sequelize-cli db:seed:undo",
+    "seed:undo:all": "npx sequelize-cli db:seed:undo:all"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Suresh-Kannan-R-V/PS-Clone-Backend.git"
+    "url": "git+https://github.com/Suresh-Kannan-R-V/Transport_Management_Backend.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/Suresh-Kannan-R-V/PS-Clone-Backend/issues"
+    "url": "https://github.com/Suresh-Kannan-R-V/Transport_Management_Backend/issues"
   },
-  "homepage": "https://github.com/Suresh-Kannan-R-V/PS-Clone-Backend#readme",
+  "homepage": "https://github.com/Suresh-Kannan-R-V/Transport_Management_Backend#readme",
   "dependencies": {
+    "axios": "^1.13.6",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "google-auth-library": "^10.5.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.1.1",
     "mysql2": "^3.16.3",
-    "nodemon": "^3.1.11",
-    "sequelize": "^6.37.7"
+    "node-cron": "^4.2.1",
+    "nodemon": "^1.0.2",
+    "sequelize": "^6.37.7",
+    "string-similarity": "^4.0.4",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "sequelize-cli": "^6.6.5"
+    "sequelize-cli": "^6.3.0"
   }
 }

@@ -6,44 +6,74 @@ module.exports = {
       id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
+
       route_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        references: { model: "routes", key: "id" }
+        references: { model: "routes", key: "id" },
+        onDelete: "CASCADE",
       },
+
       vehicle_id: {
         type: Sequelize.INTEGER,
-        allowNull: false,
-        references: { model: "vehicles", key: "id" }
+        allowNull: true,
+        references: { model: "vehicles", key: "id" },
       },
+
       driver_id: {
         type: Sequelize.INTEGER,
+        allowNull: true,
+        references: { model: "drivers", key: "id" },
+      },
+
+      allocated_passenger_count: {
+        type: Sequelize.INTEGER,
         allowNull: false,
-        references: { model: "drivers", key: "id" }
       },
-      schedule_date: {
+
+      start_datetime: {
         type: Sequelize.DATE,
-        allowNull: false
+        allowNull: false,
       },
-      start_time: {
-        type: Sequelize.TIME,
-        allowNull: false
+
+      end_datetime: {
+        type: Sequelize.DATE,
+        allowNull: false,
       },
-      end_time: {
-        type: Sequelize.TIME,
-        allowNull: false
-      },
+
       status: {
         type: Sequelize.STRING,
+        defaultValue: "vehicle_assigned",
+      },
+
+      approved_by: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        references: { model: "users", key: "id" },
+      },
+
+      approved_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+
+      created_at: {
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      },
+      updated_at: {
+        type: Sequelize.DATE,
         allowNull: false,
-        defaultValue: "scheduled"
-      }
+        defaultValue: Sequelize.literal(
+          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
+        ),
+      },
     });
   },
 
   async down(queryInterface) {
     await queryInterface.dropTable("schedules");
-  }
+  },
 };

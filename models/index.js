@@ -47,33 +47,17 @@ Object.keys(db).forEach((modelName) => {
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 
-module.exports = db;
-
 // ROLE ↔ USER
 db.Role.hasMany(db.User, { foreignKey: "role_id" });
 db.User.belongsTo(db.Role, { foreignKey: "role_id" });
 
+//USER ↔ WEB LOGIN
+db.User.hasMany(db.WebLoginSession, { foreignKey: "user_id" });
+db.WebLoginSession.belongsTo(db.User, { foreignKey: "user_id" });
+
 // USER ↔ DRIVER
 db.User.hasOne(db.Driver, { foreignKey: "user_id" });
 db.Driver.belongsTo(db.User, { foreignKey: "user_id" });
-
-// ROUTE ↔ ROUTE_STOPS
-db.Route.hasMany(db.RouteStop, { foreignKey: "route_id" });
-db.RouteStop.belongsTo(db.Route, { foreignKey: "route_id" });
-
-// ROUTE / VEHICLE / DRIVER ↔ SCHEDULE
-db.Route.hasMany(db.Schedule, { foreignKey: "route_id" });
-db.Schedule.belongsTo(db.Route, { foreignKey: "route_id" });
-
-db.Vehicle.hasMany(db.Schedule, { foreignKey: "vehicle_id" });
-db.Schedule.belongsTo(db.Vehicle, { foreignKey: "vehicle_id" });
-
-db.Driver.hasMany(db.Schedule, { foreignKey: "driver_id" });
-db.Schedule.belongsTo(db.Driver, { foreignKey: "driver_id" });
-
-// USER ↔ BOOKINGS
-db.User.hasMany(db.Booking, { foreignKey: "user_id" });
-db.Booking.belongsTo(db.User, { foreignKey: "user_id" });
 
 db.Schedule.hasMany(db.Booking, { foreignKey: "schedule_id" });
 db.Booking.belongsTo(db.Schedule, { foreignKey: "schedule_id" });
@@ -82,27 +66,18 @@ db.Booking.belongsTo(db.Schedule, { foreignKey: "schedule_id" });
 db.User.hasMany(db.LeaveRequest, { foreignKey: "user_id" });
 db.LeaveRequest.belongsTo(db.User, { foreignKey: "user_id" });
 
-db.Schedule.hasMany(db.LeaveRequest, { foreignKey: "schedule_id" });
-db.LeaveRequest.belongsTo(db.Schedule, { foreignKey: "schedule_id" });
-
-// VEHICLE ↔ VEHICLE_MAINTENANCE
-db.Vehicle.hasMany(db.VehicleMaintenance, { foreignKey: "vehicle_id" });
-db.VehicleMaintenance.belongsTo(db.Vehicle, { foreignKey: "vehicle_id" });
-
 // USER ↔ NOTIFICATIONS
 db.User.hasMany(db.Notification, { foreignKey: "user_id" });
 db.Notification.belongsTo(db.User, { foreignKey: "user_id" });
 
 // USER (ADMIN) ↔ AUDIT_LOGS
 db.User.hasMany(db.AuditLog, { foreignKey: "admin_id" });
-db.AuditLog.belongsTo(db.User, { foreignKey: "admin_id" });
-
-// VEHICLE / DRIVER / SCHEDULE ↔ USAGE_HISTORY
-db.Vehicle.hasMany(db.UsageHistory, { foreignKey: "vehicle_id" });
-db.UsageHistory.belongsTo(db.Vehicle, { foreignKey: "vehicle_id" });
+db.AuditLog.belongsTo(db.User, { foreignKey: "admin_id"});
 
 db.Driver.hasMany(db.UsageHistory, { foreignKey: "driver_id" });
 db.UsageHistory.belongsTo(db.Driver, { foreignKey: "driver_id" });
 
 db.Schedule.hasMany(db.UsageHistory, { foreignKey: "schedule_id" });
 db.UsageHistory.belongsTo(db.Schedule, { foreignKey: "schedule_id" });
+
+module.exports = db;

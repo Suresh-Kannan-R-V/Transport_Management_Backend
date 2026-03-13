@@ -6,33 +6,37 @@ module.exports = {
       id: {
         type: Sequelize.INTEGER,
         primaryKey: true,
-        autoIncrement: true
+        autoIncrement: true,
       },
+
       route_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
           model: "routes",
-          key: "id"
+          key: "id",
         },
-        onDelete: "CASCADE"
+        onDelete: "CASCADE",
       },
+
       stop_name: {
         type: Sequelize.STRING,
-        allowNull: false
+        allowNull: false,
       },
+
       stop_order: {
         type: Sequelize.INTEGER,
-        allowNull: false
+        allowNull: false,
       },
+
       pickup_time: {
         type: Sequelize.TIME,
-        allowNull: false
-      }
+        allowNull: true,
+      },
     });
   },
 
   async down(queryInterface) {
     await queryInterface.dropTable("route_stops");
-  }
+  },
 };

@@ -1,9 +1,16 @@
 module.exports = (sequelize, DataTypes) => {
-  const VehicleMaintenance = sequelize.define("VehicleMaintenance", {
-    maintenance_date: DataTypes.DATE,
-    description: DataTypes.TEXT,
-    status: DataTypes.STRING
-  });
+  const VehicleMaintenance = sequelize.define(
+    "VehicleMaintenance",
+    {
+      maintenance_date: DataTypes.DATE,
+      description: DataTypes.TEXT,
+      status: DataTypes.STRING,
+    },
+    {
+      tableName: "vehicle_maintenance",
+      timestamps: false,
+    },
+  );
 
   VehicleMaintenance.associate = (models) => {
     VehicleMaintenance.belongsTo(models.Vehicle, { foreignKey: "vehicle_id" });
