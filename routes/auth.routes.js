@@ -22,16 +22,16 @@ router.get("/web-login-session/:sessionId", webController.checkWebLoginSession);
 router.get("/device-use", private, webController.getUserDevices);
 router.post("/logout/:id", private, webController.logoutDevice);
 router.post(
-  "/logout-user",
+  "/logout-me",
   private,
-  role("Super Admin", "Transport Admin"),
+  role("Transport Admin"),
   authController.logoutUser,
 );
 
 router.post(
   "/admin/logout-user/:id",
   private,
-  role("Super Admin", "Transport Admin"),
+  role("Transport Admin"),
   authController.adminLogoutUser,
 );
 

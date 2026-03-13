@@ -66,10 +66,6 @@ db.Booking.belongsTo(db.Schedule, { foreignKey: "schedule_id" });
 db.User.hasMany(db.LeaveRequest, { foreignKey: "user_id" });
 db.LeaveRequest.belongsTo(db.User, { foreignKey: "user_id" });
 
-db.Schedule.hasMany(db.LeaveRequest, { foreignKey: "schedule_id" });
-db.LeaveRequest.belongsTo(db.Schedule, { foreignKey: "schedule_id" });
-
-
 // USER ↔ NOTIFICATIONS
 db.User.hasMany(db.Notification, { foreignKey: "user_id" });
 db.Notification.belongsTo(db.User, { foreignKey: "user_id" });

@@ -15,7 +15,8 @@ const {
   User,
   sequelize,
 } = require("../models");
-const { Op, fn, col, literal } = require("sequelize");
+const { Op } = require("sequelize");
+const { ROUTE_STATUS } = require("../utils/helper");
 
 exports.createTransportRequest = async (req, res) => {
   const t = await sequelize.transaction();
@@ -165,7 +166,7 @@ exports.createTransportRequest = async (req, res) => {
         passenger_count: passengerCount,
         description: additional_info?.special_requirements || null,
         luggage_details: additional_info?.luggage_details || null,
-        status: "pending",
+        status: ROUTE_STATUS.PENDING,
       },
       { transaction: t },
     );
@@ -186,7 +187,7 @@ exports.createTransportRequest = async (req, res) => {
         allocated_passenger_count: passengerCount,
         start_datetime: travel_info.start_date,
         end_datetime: travel_info.end_date || travel_info.start_date,
-        status: "pending",
+        status: ROUTE_STATUS.PENDING,
       },
       { transaction: t },
     );
@@ -230,12 +231,12 @@ exports.cancelTransportRequest = async (req, res) => {
 
     if (!route) throw new Error("Route not found");
 
-    if (route.status !== "pending") {
+    if (route.status !== ROUTE_STATUS.PENDING) {
       throw new Error("Cannot cancel after vehicle assignment");
     }
 
     await route.update({
-      status: "cancelled",
+      status: ROUTE_STATUS.CANCELLED,
       faculty_remark: "Cancelled by faculty",
     });
 
@@ -261,13 +262,12 @@ exports.uncancelTransportRequest = async (req, res) => {
       throw new Error("Route not found");
     }
 
-    // Only allow if currently cancelled
-    if (route.status !== "cancelled") {
+    if (route.status !== ROUTE_STATUS.CANCELLED) {
       throw new Error("Only cancelled requests can be restored");
     }
 
     await route.update({
-      status: "pending",
+      status: ROUTE_STATUS.PENDING,
       faculty_remark: null,
     });
 
@@ -301,7 +301,7 @@ exports.deleteTransportRequest = async (req, res) => {
       throw new Error("Route not found");
     }
 
-    if (req.user.role === "Faculty" && route.status !== "pending") {
+    if (req.user.role === "Faculty" && route.status !== ROUTE_STATUS.PENDING) {
       throw new Error("Faculty can delete only pending requests");
     }
 
@@ -318,11 +318,6 @@ exports.deleteTransportRequest = async (req, res) => {
     });
 
     await UsageHistory.destroy({
-      where: { schedule_id: scheduleIds },
-      transaction: t,
-    });
-
-    await LeaveRequest.destroy({
       where: { schedule_id: scheduleIds },
       transaction: t,
     });
@@ -376,27 +371,70 @@ exports.getAllRoutes = async (req, res) => {
     const search = req.query.search?.trim() || "";
     const status = req.query.status;
     const travelType = req.query.travel_type;
+    const userSearch = req.query.user?.trim() || "";
+    const userId = req.query.user_id;
+    const fromDate = req.query.from_date;
 
-    const sortBy = req.query.sortBy || "created_at";
-    const sortOrder = req.query.sortOrder || "DESC";
+    const allowedSortFields = [
+      "created_at",
+      "route_name",
+      "status",
+      "travel_type",
+      "start_datetime",
+      "end_datetime",
+    ];
+
+    const sortBy = allowedSortFields.includes(req.query.sortBy)
+      ? req.query.sortBy
+      : "created_at";
+    const sortOrder = req.query.sortOrder === "ASC" ? "ASC" : "DESC";
 
     let whereCondition = {};
 
-    if (status && status !== "") {
-      whereCondition.status = status;
+    if (req.query.status !== undefined) {
+      const statuses = Array.isArray(req.query.status)
+        ? req.query.status
+        : [req.query.status];
+
+      const parsedStatuses = statuses
+        .map((s) => parseInt(s, 10))
+        .filter((s) => !isNaN(s));
+
+      if (parsedStatuses.length === 1) {
+        whereCondition.status = parsedStatuses[0];
+      } else if (parsedStatuses.length > 1) {
+        whereCondition.status = {
+          [Op.in]: parsedStatuses,
+        };
+      }
     }
 
     if (travelType && travelType !== "") {
       whereCondition.travel_type = travelType;
     }
-
+    if (req.user.role === "Faculty") {
+      whereCondition.created_by = req.user.id;
+    } else if (userId) {
+      whereCondition.created_by = parseInt(userId);
+    }
     if (search) {
       whereCondition.route_name = {
         [Op.like]: `%${search}%`,
       };
     }
+    if (userSearch) {
+      whereCondition[Op.or] = [
+        { "$creator.name$": { [Op.like]: `%${userSearch}%` } },
+        { "$creator.user_name$": { [Op.like]: `%${userSearch}%` } },
+        { "$creator.email$": { [Op.like]: `%${userSearch}%` } },
+      ];
+    }
 
-    let orderClause = [[sortBy, sortOrder]];
+    if (fromDate) {
+      whereCondition.start_datetime = {
+        [Op.gt]: new Date(fromDate),
+      };
+    }
 
     const { rows, count } = await Route.findAndCountAll({
       where: whereCondition,
@@ -404,16 +442,20 @@ exports.getAllRoutes = async (req, res) => {
         {
           model: User,
           as: "creator",
-          attributes: ["id", "name", "faculty_id"],
+          attributes: ["id", "name", "faculty_id", "user_name", "email"],
+
           include: [{ model: Role, attributes: ["id", "name"] }],
         },
         {
           model: RouteStop,
           attributes: ["stop_name", "stop_order"],
+          separate: true,
+          order: [["stop_order", "ASC"]],
         },
         {
           model: Schedule,
           attributes: ["id"],
+          separate: true,
           include: [
             {
               model: Vehicle,
@@ -434,27 +476,14 @@ exports.getAllRoutes = async (req, res) => {
       limit,
       offset,
       distinct: true,
-      order: orderClause, // ✅ FIXED
+      subQuery: false,
+      order: [[sortBy, sortOrder]],
     });
 
     const formatted = rows.map((route) => {
       const schedules = route.Schedules || [];
 
-      let vehicleAssigned = null;
-      if (schedules.length === 1 && schedules[0].Vehicle) {
-        vehicleAssigned = schedules[0].Vehicle.vehicle_number;
-      } else if (schedules.length > 1) {
-        vehicleAssigned = schedules.length;
-      }
-
       const drivers = schedules.filter((s) => s.Driver);
-      let driverAssigned = null;
-
-      if (drivers.length === 1) {
-        driverAssigned = drivers[0].Driver.User.name;
-      } else if (drivers.length > 1) {
-        driverAssigned = drivers.length;
-      }
 
       const sortedStops =
         route.RouteStops?.sort((a, b) => a.stop_order - b.stop_order) || [];
@@ -484,9 +513,10 @@ exports.getAllRoutes = async (req, res) => {
           sortedStops.length > 2
             ? sortedStops.slice(1, -1).map((s) => s.stop_name)
             : [],
-        vehicleAssigned,
-        driverAssigned,
+        vehicleAssigned: schedules.length,
+        driverAssigned: drivers.length,
         createdAt: route.created_at,
+        updatedAt: route.updated_at,
       };
     });
 
@@ -557,7 +587,7 @@ exports.getRouteById = async (req, res) => {
           include: [
             {
               model: Vehicle,
-              attributes: ["id", "vehicle_number", "vehicle_type"],
+              attributes: ["id", "vehicle_number", "vehicle_type", "capacity"],
             },
             {
               model: Driver,
@@ -616,6 +646,7 @@ exports.getRouteById = async (req, res) => {
               id: schedule.Vehicle.id,
               vehicle_number: schedule.Vehicle.vehicle_number,
               vehicle_type: schedule.Vehicle.vehicle_type,
+              vehicle_capacity: schedule.Vehicle.capacity,
               assigned_at: schedule.approved_at,
               assigned_by: schedule.approver?.name || null,
             }
@@ -655,7 +686,6 @@ exports.getRouteById = async (req, res) => {
           status: guest.booking_status,
         })) || [];
 
-    // ---------- FINAL RESPONSE ----------
     const response = {
       travel_info: {
         route_name: route.route_name,
@@ -684,6 +714,7 @@ exports.getRouteById = async (req, res) => {
       faculty_remark: route.faculty_remark,
       admin_remark: route.admin_remark,
       created_at: route.created_at,
+      updated_at: route.updated_at,
 
       creator: route.creator,
 
@@ -699,298 +730,6 @@ exports.getRouteById = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch route details",
-    });
-  }
-};
-
-//Admin Assign the vehicles
-exports.assignVehicles = async (req, res) => {
-  const t = await sequelize.transaction();
-
-  try {
-    const { route_id, allocations, faculty_remark, admin_remark } = req.body;
-
-    if (!route_id || !Array.isArray(allocations) || allocations.length === 0) {
-      throw new Error("route_id and allocations are required");
-    }
-
-    const route = await Route.findByPk(route_id, {
-      include: [{ model: Booking }],
-      transaction: t,
-    });
-
-    if (!route) throw new Error("Route not found");
-    if (!route.Bookings.length) throw new Error("No bookings found");
-
-    // 🔹 Save remarks if provided
-    await route.update(
-      {
-        faculty_remark: faculty_remark ?? route.faculty_remark,
-        admin_remark: admin_remark ?? route.admin_remark,
-        status: "Vehicle Assigned",
-      },
-      { transaction: t },
-    );
-
-    const totalGuests = route.Bookings.length;
-    const assignedGuestIds = allocations.flatMap((a) => a.guest_ids);
-
-    if (new Set(assignedGuestIds).size !== assignedGuestIds.length)
-      throw new Error("Duplicate guest assignment detected");
-
-    if (assignedGuestIds.length !== totalGuests)
-      throw new Error("All guests must be assigned");
-
-    const vehicleIds = allocations.map((a) => a.vehicle_id);
-
-    for (const allocation of allocations) {
-      const { vehicle_id, guest_ids } = allocation;
-
-      let schedule = await Schedule.create(
-        {
-          route_id,
-          vehicle_id,
-          driver_id: null,
-          allocated_passenger_count: guest_ids.length,
-          start_datetime: route.start_datetime,
-          end_datetime: route.end_datetime || route.start_datetime,
-          status: "Vehicle Assigned",
-          approved_by: req.user.id,
-          approved_at: new Date(),
-        },
-        { transaction: t },
-      );
-
-      await Booking.update(
-        { schedule_id: schedule.id },
-        { where: { id: guest_ids }, transaction: t },
-      );
-    }
-
-    // 🔥 Mark vehicles as assigned
-    await Vehicle.update(
-      { status: "assigned" },
-      { where: { id: vehicleIds }, transaction: t },
-    );
-
-    await t.commit();
-
-    return res.status(200).json({
-      success: true,
-      message: "Vehicle allocation created successfully",
-    });
-  } catch (error) {
-    await t.rollback();
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-//Admin Updating the Vehicle Assign already exist.
-exports.updateAssignedVehicles = async (req, res) => {
-  const t = await sequelize.transaction();
-
-  try {
-    const { route_id, allocations, faculty_remark, admin_remark } = req.body;
-
-    if (!route_id || !Array.isArray(allocations) || allocations.length === 0) {
-      throw new Error("route_id and allocations are required");
-    }
-
-    const route = await Route.findByPk(route_id, {
-      include: [{ model: Booking }],
-      transaction: t,
-    });
-
-    if (!route) throw new Error("Route not found");
-    if (!route.Bookings.length) throw new Error("No bookings found");
-
-    // 🔹 Update remarks if provided
-    await route.update(
-      {
-        faculty_remark: faculty_remark ?? route.faculty_remark,
-        admin_remark: admin_remark ?? route.admin_remark,
-        status: "Vehicle Assigned",
-      },
-      { transaction: t },
-    );
-
-    const totalGuests = route.Bookings.length;
-    const assignedGuestIds = allocations.flatMap((a) => a.guest_ids);
-
-    if (new Set(assignedGuestIds).size !== assignedGuestIds.length)
-      throw new Error("Duplicate guest assignment detected");
-
-    if (assignedGuestIds.length !== totalGuests)
-      throw new Error("All guests must be assigned");
-
-    const existingSchedules = await Schedule.findAll({
-      where: { route_id },
-      transaction: t,
-    });
-
-    if (!existingSchedules.length) throw new Error("No vehicles assigned yet.");
-
-    const existingVehicleIds = existingSchedules.map((s) => s.vehicle_id);
-    const incomingVehicleIds = allocations.map((a) => a.vehicle_id);
-
-    // 🔥 Vehicles removed → set active
-    const removedVehicleIds = existingVehicleIds.filter(
-      (id) => !incomingVehicleIds.includes(id),
-    );
-
-    if (removedVehicleIds.length) {
-      await Vehicle.update(
-        { status: "active" },
-        { where: { id: removedVehicleIds }, transaction: t },
-      );
-    }
-
-    // 🔥 Remove deleted schedules
-    for (const schedule of existingSchedules) {
-      if (!incomingVehicleIds.includes(schedule.vehicle_id)) {
-        await Booking.update(
-          { schedule_id: null },
-          { where: { schedule_id: schedule.id }, transaction: t },
-        );
-
-        await Schedule.destroy({
-          where: { id: schedule.id },
-          transaction: t,
-        });
-      }
-    }
-
-    // 🔥 Update/Create schedules
-    for (const allocation of allocations) {
-      const { vehicle_id, guest_ids } = allocation;
-
-      let schedule = existingSchedules.find((s) => s.vehicle_id === vehicle_id);
-
-      if (schedule) {
-        await schedule.update(
-          {
-            allocated_passenger_count: guest_ids.length,
-            approved_by: req.user.id,
-            approved_at: new Date(),
-          },
-          { transaction: t },
-        );
-      } else {
-        schedule = await Schedule.create(
-          {
-            route_id,
-            vehicle_id,
-            driver_id: null,
-            allocated_passenger_count: guest_ids.length,
-            start_datetime: route.start_datetime,
-            end_datetime: route.end_datetime || route.start_datetime,
-            status: "Vehicle Assigned",
-            approved_by: req.user.id,
-            approved_at: new Date(),
-          },
-          { transaction: t },
-        );
-      }
-
-      await Booking.update(
-        { schedule_id: schedule.id },
-        { where: { id: guest_ids }, transaction: t },
-      );
-    }
-
-    // 🔥 Mark all incoming vehicles as assigned
-    await Vehicle.update(
-      { status: "assigned" },
-      { where: { id: incomingVehicleIds }, transaction: t },
-    );
-
-    await t.commit();
-
-    return res.status(200).json({
-      success: true,
-      message: "Vehicle allocation updated successfully",
-    });
-  } catch (error) {
-    await t.rollback();
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-// Admin Assign the driver
-exports.assignDriver = async (req, res) => {
-  try {
-    const { schedule_id, driver_id } = req.body;
-
-    if (!schedule_id || !driver_id) {
-      throw new Error("schedule_id and driver_id required");
-    }
-
-    const schedule = await Schedule.findByPk(schedule_id);
-
-    if (!schedule) throw new Error("Schedule not found");
-
-    await schedule.update({
-      driver_id,
-      status: "driver_assigned",
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Driver assigned successfully",
-    });
-  } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
-
-//Admin changes the status of the route
-exports.changeRouteStatus = async (req, res) => {
-  try {
-    const { route_id, status, remark } = req.body;
-
-    if (!route_id || !status) {
-      throw new Error("route_id and status required");
-    }
-
-    const allowedStatuses = [
-      "Approved",
-      "Rejected",
-      "Vehicle Assigned",
-      "Driver Assigned",
-      "Completed",
-      "Cancelled by Admin",
-    ];
-
-    if (!allowedStatuses.includes(status)) {
-      throw new Error("Invalid status");
-    }
-
-    const route = await Route.findByPk(route_id);
-
-    if (!route) throw new Error("Route not found");
-
-    await route.update({
-      status,
-      admin_remark: remark || null,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Route status updated to ${status}`,
-    });
-  } catch (error) {
-    return res.status(400).json({
-      success: false,
-      message: error.message,
     });
   }
 };

@@ -17,8 +17,6 @@ module.exports = {
           model: "roles",
           key: "id",
         },
-        onUpdate: "CASCADE",
-        onDelete: "RESTRICT",
       },
 
       name: {
@@ -46,6 +44,12 @@ module.exports = {
       phone: {
         type: Sequelize.STRING,
         allowNull: true,
+        unique: true,
+      },
+      age: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: 0,
       },
 
       isLogin: {
@@ -58,8 +62,6 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
-
-      // ✅ NEW COLUMNS INCLUDED
 
       faculty_id: {
         type: Sequelize.STRING,
@@ -89,6 +91,13 @@ module.exports = {
         type: Sequelize.DATE,
         allowNull: false,
         defaultValue: Sequelize.literal("CURRENT_TIMESTAMP"),
+      },
+      updated_at: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.literal(
+          "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+        ),
       },
     });
   },

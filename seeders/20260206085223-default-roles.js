@@ -9,10 +9,10 @@ module.exports = {
           name: "Transport Admin",
         },
         {
-          name: "Driver",
+          name: "Faculty",
         },
         {
-          name: "Faculty",
+          name: "Driver",
         },
       ],
       {},

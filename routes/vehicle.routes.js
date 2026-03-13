@@ -24,7 +24,7 @@ router.delete(
 router.get(
   "/get-all",
   auth,
-  role("Transport Admin"),
+  role("Transport Admin","Faculty"),
   vehicleController.getAllVehicles,
 );
 

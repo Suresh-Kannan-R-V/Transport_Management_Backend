@@ -2,7 +2,8 @@ const express = require("express");
 const router = express.Router();
 const upload = require("../middleware/upload.middleware");
 const role = require("../middleware/role");
-const controller = require("../controller/facultyRequest.controller");
+const facultyRequestController = require("../controller/facultyRequest.controller");
+const assignRequestController = require("../controller/assignRoute.controller");
 const auth = require("../middleware/sessionAuth.middleware");
 
 router.post(
@@ -10,56 +11,56 @@ router.post(
   auth,
   role("Transport Admin", "Faculty"),
   upload.single("file"),
-  controller.createTransportRequest,
+  facultyRequestController.createTransportRequest,
 );
 
 router.patch(
   "/cancel-transport-request/:route_id",
   auth,
-  role("Faculty"),
-  controller.cancelTransportRequest,
+  role("Faculty", "Transport Admin"),
+  facultyRequestController.cancelTransportRequest,
 );
 
 router.patch(
   "/uncancel-transport-request/:route_id",
   auth,
   role("Faculty", "Transport Admin"),
-  controller.uncancelTransportRequest,
+  facultyRequestController.uncancelTransportRequest,
 );
 
 router.delete(
   "/delete-transport-request/:route_id",
   auth,
   role("Faculty", "Transport Admin"),
-  controller.deleteTransportRequest,
+  facultyRequestController.deleteTransportRequest,
 );
 
 router.get(
   "/get-all",
   auth,
   role("Transport Admin", "Faculty"),
-  controller.getAllRoutes,
+  facultyRequestController.getAllRoutes,
 );
 
 router.get(
   "/get-by-id/:route_id",
   auth,
   role("Transport Admin", "Faculty"),
-  controller.getRouteById,
+  facultyRequestController.getRouteById,
 );
 
 //Admin
 router.post(
   "/assign-vehicles",
   auth,
-  role("Transport Admin"),
-  controller.assignVehicles,
+  role("Transport Admin", "Faculty"),
+  assignRequestController.assignVehicles,
 );
 router.put(
   "/update-assigned-vehicles",
   auth,
-  role("Transport Admin"),
-  controller.updateAssignedVehicles,
+  role("Transport Admin", "Faculty"),
+  assignRequestController.updateAssignedVehicles,
 );
 
 // Assign driver separately
@@ -67,15 +68,23 @@ router.patch(
   "/assign-driver",
   auth,
   role("Transport Admin"),
-  controller.assignDriver,
+  assignRequestController.assignDriver,
+);
+router.patch(
+  "/update-driver-assign",
+  auth,
+  role("Transport Admin"),
+  assignRequestController.updateDriverAssign,
 );
 
 // Change route status (approve / reject / complete)
 router.patch(
   "/change-route-status",
   auth,
-  role("Transport Admin"),
-  controller.changeRouteStatus,
+  role("Transport Admin", "Faculty"),
+  assignRequestController.changeRouteStatus,
 );
+
+router.use("/", require("./routeStartOTP.routes"));
 
 module.exports = router;

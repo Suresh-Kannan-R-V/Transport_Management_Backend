@@ -2,10 +2,16 @@ module.exports = (sequelize, DataTypes) => {
   const Vehicle = sequelize.define(
     "Vehicle",
     {
+      id: {
+        type: DataTypes.INTEGER,
+        primaryKey: true,
+        autoIncrement: true,
+      },
+
       vehicle_number: {
         type: DataTypes.STRING,
-        unique: true,
         allowNull: false,
+        unique: true,
       },
 
       vehicle_type: {
@@ -27,6 +33,13 @@ module.exports = (sequelize, DataTypes) => {
       current_kilometer: {
         type: DataTypes.INTEGER,
         allowNull: false,
+        defaultValue: 0,
+      },
+
+      total_kilometer_runs: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
       },
 
       insurance_date: {
@@ -56,7 +69,9 @@ module.exports = (sequelize, DataTypes) => {
     },
     {
       tableName: "vehicles",
-      timestamps: false,
+      timestamps: true,
+      createdAt: "created_at",
+      updatedAt: "updated_at",
     },
   );
 

@@ -150,13 +150,36 @@ exports.loginByNamePassword = async (req, res) => {
 
 exports.logoutUser = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization header missing",
+      });
+    }
+
+    const tokenParts = authHeader.split(" ");
+
+    if (tokenParts.length !== 2) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token format",
+      });
+    }
+
+    const token = tokenParts[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userEmail = decoded.email;
 
     await User.update(
       {
         isLogin: false,
+        // token: null,
       },
-      { where: { id: userId } },
+      {
+        where: { email: userEmail },
+      },
     );
 
     return res.status(200).json({
@@ -165,9 +188,9 @@ exports.logoutUser = async (req, res) => {
     });
   } catch (err) {
     console.error("Logout error:", err);
-    return res.status(500).json({
+    return res.status(401).json({
       success: false,
-      message: "Logout failed",
+      message: "Invalid or expired token",
     });
   }
 };

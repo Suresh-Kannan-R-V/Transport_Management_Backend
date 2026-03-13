@@ -19,6 +19,11 @@ app.use("/auth", require("./routes/auth.routes"));
 app.use("/auth", require("./routes/user.routes"));
 app.use("/api", require("./routes/route"));
 app.use("/request", require("./routes/facultyRequest.routes"));
+app.use("/path",require("./routes/pathPermission.routes"))
+
+//jobs Automation for leave status update
+const updateDriverStatusAfterLeave = require("./jobs/leaveStatus.job");
+updateDriverStatusAfterLeave();
 
 const PORT = process.env.PORT || 8000;
 
@@ -32,6 +37,3 @@ app.listen(PORT, async () => {
     console.log(" Sync error:", error);
   }
 });
-
-
-

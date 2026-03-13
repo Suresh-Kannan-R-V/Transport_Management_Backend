@@ -59,8 +59,9 @@ module.exports = (sequelize, DataTypes) => {
       },
 
       status: {
-        type: DataTypes.STRING,
-        defaultValue: "pending",
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 1, // 1 = PENDING
       },
 
       faculty_remark: {
@@ -72,15 +73,20 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: true,
       },
-
       created_at: {
+        type: DataTypes.DATE,
+        defaultValue: DataTypes.NOW,
+      },
+      updated_at: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW,
       },
     },
     {
       tableName: "routes",
-      timestamps: false,
+      timestamps: true,
+      createdAt: "created_at",
+      updatedAt: "updated_at",
     },
   );
 
@@ -105,6 +111,10 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "entity_id",
       scope: { entity: "route" },
       constraints: false,
+    });
+    Route.hasMany(models.RouteOtp, {
+      foreignKey: "route_id",
+      as: "route_otps",
     });
   };
 
