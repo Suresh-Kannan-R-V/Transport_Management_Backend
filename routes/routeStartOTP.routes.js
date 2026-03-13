@@ -14,7 +14,7 @@ router.post(
 router.post(
   "/start-route",
   auth,
-  role("Driver", "Transport Admin"),
+  role("Driver"),
   routeStartController.startRoute,
 );
 
@@ -28,7 +28,7 @@ router.post(
 router.post(
   "/complete-route-otp",
   auth,
-  role("Driver", "Transport Admin"),
+  role("Driver"),
   routeStartController.completeRouteWithOTP,
 );
 
